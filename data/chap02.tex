@@ -151,16 +151,16 @@
 
 \section{坐标系定义}
 
-本课题的设计中考虑了7个主要参考坐标系：全局坐标系$(\cdot)^{g}$、视觉建图世界坐标系$(\cdot)^{w}$、视觉建图地图关键帧坐标系$(\cdot)^{k}$、VIO世界坐标系$(\cdot)^{o}$、定位体坐标系$(\cdot)^{b}$、车身坐标系$(\cdot)^{v}$和定位相机坐标系$(\cdot)^{c}$。所有这些都是笛卡尔坐标系，如图~\ref{fig:frames}所示。
+本课题的设计中考虑了7个主要参考坐标系：全局坐标系$(\cdot)^{g}$、视觉建图世界坐标系$(\cdot)^{w}$、视觉建图地图关键帧坐标系$(\cdot)^{k}$、VIO世界坐标系$(\cdot)^{o}$、IMU$(\cdot)^{b}$、车身坐标系$(\cdot)^{v}$和定位相机坐标系$(\cdot)^{c}$。所有这些都是笛卡尔坐标系，如图~\ref{fig:frames}所示。
 
-全局坐标系$(\cdot)^{g}$基于局部切平面坐标定义，例如东-北-上(East-North-Up，ENU)或北-东-下(North-East-Down，NED)，本文采用ENU作为全局坐标系。视觉建图世界坐标系$(\cdot)^{w}$在离线建图阶段初期建立，并固定在第一个地图关键帧上。视觉建图地图关键帧坐标系$(\cdot)^{k}$和定位相机坐标系$(\cdot)^{c}$附着于相机的光学中心，这两个坐标系用于表示投影误差，而投影误差是优化的主要目标。定位体坐标系$(\cdot)^{b}$是VIO中IMU的坐标系，用来指示加速度、角速度方向。车身坐标系$(\cdot)^{v}$表示车或者机器人(轮式)的理想物理模型质点，一般设定为车底盘某位置，在本文中由于估计的需求，将其设定与定位体坐标系$(\cdot)^{b}$原点重合，但是坐标系之间有所旋转。由于关键帧坐标系、相机坐标系、定位体坐标系和车身坐标系随时间变化，我们使用下标$i$表示第$i$时刻的视觉建图地图关键帧坐标系$(\cdot)^{k_i}$、定位相机坐标系$(\cdot)^{c_i}$、定位体坐标系$(\cdot)^{b_i}$和车身坐标系$(\cdot)^{v_i}$。定位VIO世界坐标系$(\cdot)^{o}$类似于视觉建图世界坐标系，固定在初始VIO状态上，但不同的是定位VIO世界坐标系的z轴与真实物理世界的重力方向重合，方向从地心指向受重力物体质心。
+全局坐标系$(\cdot)^{g}$基于局部切平面坐标定义，例如东-北-上(East-North-Up，ENU)或北-东-下(North-East-Down，NED)，本文采用ENU作为全局坐标系。视觉建图世界坐标系$(\cdot)^{w}$在离线建图阶段初期建立，并固定在第一个地图关键帧上。视觉建图地图关键帧坐标系$(\cdot)^{k}$和定位相机坐标系$(\cdot)^{c}$附着于相机的光学中心，这两个坐标系用于表示投影误差，而投影误差是优化的主要目标。IMU体坐标系$(\cdot)^{b}$是VIO中IMU的读数坐标系，用来指示加速度、角速度方向。车身坐标系$(\cdot)^{v}$表示车或者机器人(轮式)的理想物理模型质点，一般设定为车底盘某位置，在本文中由于估计的需求，将其设定与IMU体坐标系$(\cdot)^{b}$原点重合，但是坐标系之间有所旋转。由于关键帧坐标系、相机坐标系、IMU体坐标系和车身坐标系随时间变化，我们使用下标$i$表示第$i$时刻的视觉建图地图关键帧坐标系$(\cdot)^{k_i}$、定位相机坐标系$(\cdot)^{c_i}$、IMU体坐标系$(\cdot)^{b_i}$和车身坐标系$(\cdot)^{v_i}$。定位VIO世界坐标系$(\cdot)^{o}$类似于视觉建图世界坐标系，固定在初始VIO状态上，但不同的是定位VIO世界坐标系的z轴与真实物理世界的重力方向重合，方向从地心指向受重力物体质心。
 
-旋转和平移分别用矩阵$\mathbf{R} \in SO(3)$和向量$\mathbf{t} \in \mathbb{R}^{3}$表示。齐次线性变换用矩阵$\mathbf{T} = \begin{bmatrix} \mathbf{R} & \mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix} \in SE(3)$表示，其中$\mathbf{T}_{a}^{b}$表示从$a$坐标系到$b$坐标系的变换矩阵，其逆矩阵可以通过以下方式轻松获得
+旋转和平移分别用矩阵$\symbf{R} \in SO(3)$和向量$\symbf{t} \in \mathbb{R}^{3}$表示。齐次线性变换用矩阵$\symbf{T} = \begin{bmatrix} \symbf{R} & \symbf{t} \\ \symbf{0}^T & 1 \end{bmatrix} \in SE(3)$表示，其中$\symbf{T}_{a}^{b}$表示从$a$坐标系到$b$坐标系的变换矩阵，其逆矩阵可以通过以下方式轻松获得
 
 \begin{equation}
-  \mathbf{T}^a_b = {\mathbf{T}_a^b}^{-1} = \begin{bmatrix} {\mathbf{R}_a^b}^T & -{\mathbf{R}_a^b}^T\cdot\mathbf{t}_a^b \\ \mathbf{0}^T & 1 \end{bmatrix}.
+  \symbf{T}^a_b = {\symbf{T}_a^b}^{-1} = \begin{bmatrix} {\symbf{R}_a^b}^T & -{\symbf{R}_a^b}^T\cdot\symbf{t}_a^b \\ \symbf{0}^T & 1 \end{bmatrix}.
 \end{equation}
-在第3章的VIO中还涉及到四元数表示的旋转，四元数$\mathbf{q} = [q_w, q_x, q_y, q_z]^T$，其中$q_w$是实部，$q_x, q_y, q_z$是虚部，四元数的模长为1，即$\mathbf{q}^T\mathbf{q} = 1$。四元数的基本运算以及四元数与旋转矩阵之间的转换关系可以参考附录\ref{appendix:quat}。
+在第3章的VIO中还涉及到四元数表示的旋转，四元数$\symbf{q} = [q_w, q_x, q_y, q_z]^T$，其中$q_w$是实部，$q_x, q_y, q_z$是虚部，四元数的模长为1，即$\symbf{q}^T\symbf{q} = 1$。四元数的基本运算以及四元数与旋转矩阵之间的转换关系可以参考附录\ref{appendix:quat}。
 
 \section{离线建图模块概述}
 
@@ -259,9 +259,9 @@
   \caption{语义分割类别分布与屏蔽情况}
   \begin{tabular}{cccccccccccc}
   \toprule
-  类别 & road & ... & sky & person & rider & car & truck & bus & train & motorcycle & bicycle \\
+  类别 & road & $\dots$ & sky & person & rider & car & truck & bus & train & motorcycle & bicycle \\
   \midrule
-  标签序号 & 0    &  ... & 10  & 11 & 12 & 13 & 14 & 15  & 16 & 17 & 18 \\
+  标签序号 & 0    &  $\dots$ & 10  & 11 & 12 & 13 & 14 & 15  & 16 & 17 & 18 \\
   屏蔽   &     &    &    & \checkmark &  \checkmark    &  \checkmark  &  \checkmark &  \checkmark  &   \checkmark   &  \checkmark  & \checkmark \\ 
   \bottomrule 
   \end{tabular}
@@ -282,49 +282,49 @@
 
 \section{SfM}
 
-经过建图预处理的图像会进行SfM，构建初步的点云地图。SfM是一种摄影测量技术，用于从二维图像序列中估计三维结构\cite{schonberger2016structure}。SfM以地图关键帧序列$\mathcal{K} = \{K_i \mid i=1 \ldots N_{K} \}$和相机内参矩阵$\mathbf{K}$作为输入，输出地图关键帧序列的六自由度位姿$\mathcal{T} = \{\mathbf{T}^{k_i}_w \mid i=1 \ldots N_K \}$以及空间点集$\mathcal{P} = \{\mathbf{p}_{m}^{w} \in \mathbb{R}^3 \mid m=1 \ldots N_P\}$，统称为稀疏点云结构。需要注意的是，相机内参矩阵数量本应与地图关键帧数量对应，但是对于固定路线定位来说，建图所用图像均由同一相机拍摄，因此共用一个内参。
+经过建图预处理的图像会进行SfM，构建初步的点云地图。SfM是一种摄影测量技术，用于从二维图像序列中估计三维结构\cite{schonberger2016structure}。SfM以地图关键帧序列$\symcal{K} = \{K_i \mid i=1 \ldots N_{K} \}$和相机内参矩阵$\symbf{K}$作为输入，输出地图关键帧序列的六自由度位姿$\symcal{T} = \{\symbf{T}^{k_i}_w \mid i=1 \ldots N_K \}$以及空间点集$\symcal{P} = \{\symbf{p}_{m}^{w} \in \mathbb{R}^3 \mid m=1 \ldots N_P\}$，统称为稀疏点云结构。需要注意的是，相机内参矩阵数量本应与地图关键帧数量对应，但是对于固定路线定位来说，建图所用图像均由同一相机拍摄，因此共用一个内参。
 
-SfM通常以特征检测和匹配为第一步：对于每个地图关键帧$K_i$，SfM检测出一组局部特征$\mathcal{F}_i = \{(\mathbf{x}_j, \mathbf{f}_j) \mid j = 1, \ldots, N_{F_i}\}$，其中 $\mathbf{x}_j \in \mathbb{R}^2$表示特征点的位置，$\mathbf{f}_j \in \mathbb{R}^{d_l}$ 表示其 ${d_l}$ 维特征描述子。随后，进行图像匹配以识别捕捉到同一场景区域的关键帧，在这个过程中基于描述子的匹配方法被广泛采用。在本文中，由于建图预处理部分已经对地图关键帧的相对位置进行了筛选，因此相邻的关键帧已经具有了足够的共视区域，可以直接进行匹配，简化了匹配过程。
+SfM通常以特征检测和匹配为第一步：对于每个地图关键帧$K_i$，SfM检测出一组局部特征$\symcal{F}_i = \{(\symbf{x}_j, \symbf{f}_j) \mid j = 1, \ldots, N_{F_i}\}$，其中 $\symbf{x}_j \in \mathbb{R}^2$表示特征点的位置，$\symbf{f}_j \in \mathbb{R}^{d_l}$ 表示其 ${d_l}$ 维特征描述子。随后，进行图像匹配以识别捕捉到同一场景区域的关键帧，在这个过程中基于描述子的匹配方法被广泛采用。在本文中，由于建图预处理部分已经对地图关键帧的相对位置进行了筛选，因此相邻的关键帧已经具有了足够的共视区域，可以直接进行匹配，简化了匹配过程。
 
-在相邻帧之外，为了通过闭环检测减轻漂移的问题，本文在建图时还引入了基于闭环检测的匹配方法。回环检测通过为每个关键帧提取一个$d_g$维的图像描述子$\mathbf{D}_i \in \mathbb{R}^{d_g}$，并计算所有地图关键帧之间图像描述子的相似度得分来实现，得分超过预设阈值$s$的前$m$对被选为回环闭合对。对于所有匹配上的地图关键帧对，SfM通过特征点描述子匹配特征点，并利用这些匹配点估计两个关键帧之间的相对位姿。
+在相邻帧之外，为了通过闭环检测减轻漂移的问题，本文在建图时还引入了基于闭环检测的匹配方法。回环检测通过为每个关键帧提取一个$d_g$维的图像描述子$\symbf{D}_i \in \mathbb{R}^{d_g}$，并计算所有地图关键帧之间图像描述子的相似度得分来实现，得分超过预设阈值$s$的前$m$对被选为回环闭合对。对于所有匹配上的地图关键帧对，SfM通过特征点描述子匹配特征点，并利用这些匹配点估计两个关键帧之间的相对位姿。
 
-在完成特征检测和匹配之后，SfM进一步估计地图关键帧的位姿以及结构的空间坐标。通过选择第一个地图关键帧作为视觉建图世界坐标系的原点，所有关键帧的位姿$\mathcal{T}$都可以递归得通过相对位姿转换进行粗略估计。随后，SfM用三角化方法在视觉建图世界坐标系中估计稀疏点云结构$\mathcal{P}$的粗略空间坐标。位姿估计与三角化过程密切相关：位姿的不确定性会导致三角化点的可靠性下降，反之亦然。因此，为了获得精确的 $\mathcal{T}$ 和 $\mathcal{P}$，更精确的优化过程必不可少。
+在完成特征检测和匹配之后，SfM进一步估计地图关键帧的位姿以及结构的空间坐标。通过选择第一个地图关键帧作为视觉建图世界坐标系的原点，所有关键帧的位姿$\symcal{T}$都可以递归得通过相对位姿转换进行粗略估计。随后，SfM用三角化方法在视觉建图世界坐标系中估计稀疏点云结构$\symcal{P}$的粗略空间坐标。位姿估计与三角化过程密切相关：位姿的不确定性会导致三角化点的可靠性下降，反之亦然。因此，为了获得精确的 $\symcal{T}$ 和 $\symcal{P}$，更精确的优化过程必不可少。
 
 光束法平差(Bundle Adjustment, BA)是一种高效的位姿和点云结构优化方法，可通过最小化重投影误差来同时两种参数：
 \begin{equation}
 \label{eq:reproj_error}
-E_i = \sum_{j}\rho(\Vert \hat{\mathbf{x}}_j - \pi(\mathbf{T}^{k_i}_w, \mathbf{p}_{m}^{w}) \Vert ^2_2),
+E_i = \sum_{j}\rho(\Vert \hat{\symbf{x}}_j - \pi(\symbf{T}^{k_i}_w, \symbf{p}_{m}^{w}) \Vert ^2_2),
 \end{equation}
-其中，$\mathbf{p}_{m}^{w}$是图像特征点$\hat{\mathbf{x}}_j$对应的空间点三维坐标，$\rho$是一种损失函数，用于降低异常值的权重。函数 $\pi(\cdot)$ 将空间点投影到图像空间，定义如下：
+其中，$\symbf{p}_{m}^{w}$是图像特征点$\hat{\symbf{x}}_j$对应的空间点三维坐标，$\rho$是一种损失函数，用于降低异常值的权重。函数 $\pi(\cdot)$ 将空间点投影到图像空间，定义如下：
 \begin{equation}
 \label{eq:proj_func}
-\pi(\mathbf{T}^{k_i}_w, \mathbf{p}_{m}^{w}) = [\mathbf{K}\cdot(\mathbf{R}_w^{k_i}\cdot\mathbf{p}_{m}^{w}+\mathbf{t}_w^{k_i})/d_j]_{0:2},
+\pi(\symbf{T}^{k_i}_w, \symbf{p}_{m}^{w}) = [\symbf{K}\cdot(\symbf{R}_w^{k_i}\cdot\symbf{p}_{m}^{w}+\symbf{t}_w^{k_i})/d_j]_{0:2},
 \end{equation}
-其中，$d_j$ 是 $\mathbf{p}_{m}^{w}$ 在相机坐标系中的深度，$[\cdot]_{0:2}$ 表示选择向量的前两个元素。需要注意的是，$E_i$ 表示单张图像的重投影误差，因此整个BA是对输入图像序列中的所有重投影误差进行累积优化的结果。BA的进行需要使用非线性优化方法，例如高斯-牛顿法或者Levenberg-Marquardt法，而使用这两种方法需要求解误差函数\ref{eq:reproj_error}关于待求解参数$\mathbf{T}^{k_i}_w$和$\mathbf{p}_{m}^{w}$的雅可比矩阵，非线性优化过程及雅可比矩阵的推导参考附录~\ref{appendix:quat}。
+其中，$d_j$ 是 $\symbf{p}_{m}^{w}$ 在相机坐标系中的深度，$[\cdot]_{0:2}$ 表示选择向量的前两个元素。需要注意的是，$E_i$ 表示单张图像的重投影误差，因此整个BA是对输入图像序列中的所有重投影误差进行累积优化的结果。BA的进行需要使用非线性优化方法，例如高斯-牛顿法或者Levenberg-Marquardt法，而使用这两种方法需要求解误差函数\ref{eq:reproj_error}关于待求解参数$\symbf{T}^{k_i}_w$和$\symbf{p}_{m}^{w}$的雅可比矩阵，非线性优化过程及雅可比矩阵的推导参考附录~\ref{appendix:quat}。
 
 
 \section{建图对齐}
 
 SfM可以为离线建图阶段的图像提供精化的位姿和稀疏点云地图，但这些位姿和结构并不是在全局坐标系下的，并且缺乏真实世界的物理尺度，因此不适用于实际的定位任务。为了解决这一问题，本文利用图像的对应GNSS观测数据，将SfM的输出与真实世界的物理尺度对齐。标准GNSS报文仅提供地理坐标系中的纬度、经度和海拔信息，地理坐标系是一种墨卡托坐标系，而地图关键帧位姿和点云结构都是在笛卡尔坐标系中。因此，需要首先将原始GNSS报文信息从地理坐标系统转换为笛卡尔ENU坐标系中的位置序列
-$\mathcal{L} = \{\mathbf{l}_{k_i}^g \in \mathbb{R}^3 \mid i=1 \ldots N_K \}$。
+$\symcal{L} = \{\symbf{l}_{k_i}^g \in \mathbb{R}^3 \mid i=1 \ldots N_K \}$。
 这一过程遵循Subirana等人 \cite{subirana2011transformations} 提出的转换方法，并设置
-$\mathbf{l}_{k_1}^g = \mathbf{0}$ 以确保数值稳定性。
+$\symbf{l}_{k_1}^g = \symbf{0}$ 以确保数值稳定性。
 
-由于建图对齐过程不仅需要解决视觉建图世界坐标系与全局坐标系之间的变换问题，还需要处理两者之间的尺度差异，本课题采用三维相似变换(Similarity Transformation in 3D, Sim3)~\cite{horn1987closed}。Sim3包括一个比例因子 $s$、一个旋转矩阵 $\mathbf{R}_w^g$ 和一个平移向量 $\mathbf{t}_w^g$。如果第 $i$ 个地图关键帧在视觉建图世界坐标系中的位置为 $\mathbf{t}_{k_i}^{w} = -{\mathbf{R}_w^{c_i}}^T \cdot \mathbf{t}_w^{k_i}$，对应的 GNSS 观测值为 $\mathbf{l}_{k_i}^g$，则Sim3变换可以将它们对齐，具体如下：
+由于建图对齐过程不仅需要解决视觉建图世界坐标系与全局坐标系之间的变换问题，还需要处理两者之间的尺度差异，本课题采用三维相似变换(Similarity Transformation in 3D, Sim3)~\cite{horn1987closed}。Sim3包括一个比例因子 $s$、一个旋转矩阵 $\symbf{R}_w^g$ 和一个平移向量 $\symbf{t}_w^g$。如果第 $i$ 个地图关键帧在视觉建图世界坐标系中的位置为 $\symbf{t}_{k_i}^{w} = -{\symbf{R}_w^{c_i}}^T \cdot \symbf{t}_w^{k_i}$，对应的 GNSS 观测值为 $\symbf{l}_{k_i}^g$，则Sim3变换可以将它们对齐，具体如下：
 \begin{equation}
-    \mathbf{l}_{k_i}^g = s \cdot \mathbf{R}_w^g \cdot \mathbf{t}_{k_i}^{w} + \mathbf{t}_w^g.
+    \symbf{l}_{k_i}^g = s \cdot \symbf{R}_w^g \cdot \symbf{t}_{k_i}^{w} + \symbf{t}_w^g.
 \end{equation}
 Sim3 参数的最小二乘解可以通过求解以下优化问题获得：
 \begin{equation}
-  s^*, {\mathbf{R}_w^g}^*, {\mathbf{t}_w^g}^* = \underset{s,\mathbf{R}_w^g,\mathbf{t}_w^g}{\text{arg min}} \sum_i^{N_I} \Vert \mathbf{l}_{k_i}^g - s \cdot \mathbf{R}_w^g \cdot \mathbf{t}_{k_i}^{w} - \mathbf{t}_w^g \Vert_2^2.
+  s^*, {\symbf{R}_w^g}^*, {\symbf{t}_w^g}^* = \underset{s,\symbf{R}_w^g,\symbf{t}_w^g}{\text{arg min}} \sum_i^{N_I} \Vert \symbf{l}_{k_i}^g - s \cdot \symbf{R}_w^g \cdot \symbf{t}_{k_i}^{w} - \symbf{t}_w^g \Vert_2^2.
 \end{equation}
 
-利用 Sim3 参数，可以方便地将地图关键帧位姿 $\mathcal{T}$ 和稀疏点云结构 $\mathcal{P}$ 转换到具有真实物理尺度的全局坐标系中：
+利用 Sim3 参数，可以方便地将地图关键帧位姿 $\symcal{T}$ 和稀疏点云结构 $\symcal{P}$ 转换到具有真实物理尺度的全局坐标系中：
 \begin{equation}
 \begin{cases}
-    \mathbf{R}^{k_i}_g = {\mathbf{R}^{k_i}_{w}} \cdot {\mathbf{R}_w^g}^{-1}, \\
-    \mathbf{t}^{k_i}_g = s \cdot \mathbf{t}_w^{c_i} - {\mathbf{R}^{k_i}_{w}} \cdot {\mathbf{R}^{g}_{w}}^{-1} \mathbf{t}_w^g, \\
-    \mathbf{p}_m^g = s \cdot \mathbf{R}_w^g \cdot \mathbf{p}_{m}^{w} + \mathbf{t}_w^g,
+    \symbf{R}^{k_i}_g = {\symbf{R}^{k_i}_{w}} \cdot {\symbf{R}_w^g}^{-1}, \\
+    \symbf{t}^{k_i}_g = s \cdot \symbf{t}_w^{c_i} - {\symbf{R}^{k_i}_{w}} \cdot {\symbf{R}^{g}_{w}}^{-1} \symbf{t}_w^g, \\
+    \symbf{p}_m^g = s \cdot \symbf{R}_w^g \cdot \symbf{p}_{m}^{w} + \symbf{t}_w^g,
 \end{cases}.
 \end{equation}
 
@@ -333,12 +333,12 @@ Sim3 参数的最小二乘解可以通过求解以下优化问题获得：
 尽管已经获得了较为精确的地团关键帧位姿和稀疏点云结构，并成功将它们转换到全局坐标系中，但在求解Sim3参数的最小二乘解时仍可能引入误差。为了获得更精确的位姿和点云结构，还需要将当前的全局坐标系参数与GNSS观测进行融合优化。该融合过程需要确保地图关键帧位姿和点云结构同时满足GNSS和视觉的观测，因此需要在视觉BA的基础上融合进GNSS的观测约束，将全局坐标系中的重投影误差重新表示为：
 \begin{equation}
 \label{eq:new_reproj}
-    E_i = \sum_{j}\rho\left(\Vert \mathbf{x}_j - \pi(\mathbf{T}^{k_i}_g, \mathbf{p}_{m}^{g}) \Vert ^2_2\right) 
-    + \alpha \cdot \rho\left(\Vert -\mathbf{R}_g^{k_i^T}\cdot\mathbf{t}_g^{k_i} - \mathbf{l}_{k_i}^g \Vert_2^2\right),
+    E_i = \sum_{j}\rho\left(\Vert \symbf{x}_j - \pi(\symbf{T}^{k_i}_g, \symbf{p}_{m}^{g}) \Vert ^2_2\right) 
+    + \alpha \cdot \rho\left(\Vert -\symbf{R}_g^{k_i^T}\cdot\symbf{t}_g^{k_i} - \symbf{l}_{k_i}^g \Vert_2^2\right),
 \end{equation}
 其中，$\alpha$ 是一个权重系数，用于平衡视觉重投影误差与位置偏差。然后通过BA过程对式 \eqref{eq:new_reproj} 中的误差进行最小化。
 
-至此，已经介绍了地图关键帧位姿和稀疏点云结构的优化，这些空间信息有效地描述了环境结构。然而，为了在定位过程中充分利用这些信息，还需要视觉地图关键帧和稀疏点云的描述符，用于地图与实时捕获图像之间的匹配。在离线建图过程中，直接使用 $\{\mathcal{F}_i \mid i = 1, \ldots, N_K\}$ 作为地图点的描述符，$\{\mathbf{D}_i \mid i = 1, \ldots, N_K\}$ 作为关键帧描述符。离线建图模块的最终输出可以分为两个层级：粗粒度层级和细粒度层级。粗粒度层级输出包括关键帧位姿和描述符，用于建立图像匹配关系；而细粒度层级输出包括点描述符和点结构，用于实现点的匹配。
+至此，已经介绍了地图关键帧位姿和稀疏点云结构的优化，这些空间信息有效地描述了环境结构。然而，为了在定位过程中充分利用这些信息，还需要视觉地图关键帧和稀疏点云的描述符，用于地图与实时捕获图像之间的匹配。在离线建图过程中，直接使用 $\{\symcal{F}_i \mid i = 1, \ldots, N_K\}$ 作为地图点的描述符，$\{\symbf{D}_i \mid i = 1, \ldots, N_K\}$ 作为关键帧描述符。离线建图模块的最终输出可以分为两个层级：粗粒度层级和细粒度层级。粗粒度层级输出包括关键帧位姿和描述符，用于建立图像匹配关系；而细粒度层级输出包括点描述符和点结构，用于实现点的匹配。
 
 \section{本章总结}
 本章主要介绍了固定路线定位系统的整体架构和离线建图模块的设计。整体架构中建图与定位以异构的形式存在，即建图以SfM技术为基础，而定位以SLAM技术为基础，这种异构设计能够充分发挥SfM的精度优势和SLAM的速度优势。离线建图模块以视觉和GNSS融合的SfM为基础，同时根据建图需求引入了基于深度学习的语义分割、回环检测以及特征点提取技术，将更多的人类经验加入到离线建图中。离线建图模块的另一个特点是在传统SfM的基础上引入了GNSS观测作为约束和融合信息，这能够显著提升建图的精度。
