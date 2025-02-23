@@ -181,7 +181,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
       \ELSE
         \STATE $z$.append(0)
       \ENDIF
-      \STATE convert rotation matrix $Rs[j]^T \cdot Rs[i]$ to roatation vector $v$
+      \STATE $v \leftarrow Rs[j]^T \cdot Rs[i]$
       \IF{norm($v$)$<{\epsilon}_r$}
         \STATE $z$.append(1)
       \ELSE
@@ -192,7 +192,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \end{algorithmic}
 \end{algorithm}
 
-在预测真值生成方面，本文需要使用到车辆的真实运动状态。具体来说，首先根据车辆的真实运动状态的更新频率切分IMU序列，然后根据车身运动状态自动生成真值$\symbf{z}$。根据对预设状态的分类，首先根据相对位置信息判断车辆是否静止，然后根据相对旋转判断车辆是否直线行驶，具体如算法~\ref{alg1}所示，其中第16行即罗德里格斯旋转公式(Rodrigues' rotation formula)\cite{dai2015euler}将旋转矩阵转换为旋转向量。
+在预测真值生成方面，本文需要使用到车辆的真实运动状态。具体来说，首先根据车辆的真实运动状态的更新频率切分IMU序列，然后根据车身运动状态自动生成真值$\symbf{z}$。根据对预设状态的分类，首先根据相对位置信息判断车辆是否静止，然后根据相对旋转判断车辆是否直线行驶，具体如算法~\ref{alg1}所示，其中第16行即罗德里格斯旋转公式(Rodrigues' rotation formula)\cite{dai2015euler}将旋转矩阵转换为旋转向量，其具体过程详见附录~\ref{appendix:quat}，$\text{norm}(\cdot)$表示对向量取模操作。
 
 \begin{figure}
   \centering
@@ -223,7 +223,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \begin{equation}
   \{\symbf{v}^{v_{j}}\}^n = \{ \begin{bmatrix}
     0 \\
-    || \symbf{v}^{b_{j}} || \\ 
+    \| \symbf{v}^{b_{j}} \| \\ 
     0
   \end{bmatrix}\}^n.
 \end{equation}
@@ -247,8 +247,8 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \begin{equation}
 \begin{aligned}
   2\symbf{J} &= \sum_{j=1}^{n} ({\symbf{v}^{v_{j}}}^T \cdot \symbf{v}^{v_{j}} - {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} - {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot {\symbf{v}^{v_{j}}} + {\symbf{v}^{b_{j}}}^T \cdot \symbf{v}^{b_{j}}) \\ 
-  &= \sum_{j=1}^{n} (|| \symbf{v}^{v_{j}} ||^2 - 2\cdot {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} + || \symbf{v}^{b_{j}} ||^2) \\
-  &= \sum_{j=1}^{n} (|| \symbf{v}^{v_{j}} ||^2 + || \symbf{v}^{b_{j}} ||^2) - 2 \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}}
+  &= \sum_{j=1}^{n} (\| \symbf{v}^{v_{j}} \|^2 - 2\cdot {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} + \| \symbf{v}^{b_{j}} \|^2) \\
+  &= \sum_{j=1}^{n} (\| \symbf{v}^{v_{j}} \|^2 + \| \symbf{v}^{b_{j}} \|^2) - 2 \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}}
 \end{aligned},
 \end{equation}
 可以观察到此时$\symbf{J}$的最小化与前一常数项无关，仅与后项带$\symbf{R}_b^v$的项有关，因此可以将$\symbf{J}$的最小化问题转化为最大化后一项，即
@@ -297,9 +297,9 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 
 根据以上的状态估计量，可以得到视觉惯性里程计的优化目标函数
 \begin{equation}
-  \min_{\mathcal{X}} \begin{Bmatrix} || \symbf{r}_p - \symbf{H}_p \cdot \mathcal{X} ||^2 + \sum_{k\in\mathcal{B}} || \symbf{r}_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) ||^2_{\symbf{P}_{b_k}^{b_{k+1}}} + \sum_{(l,j)\in\mathcal{C}} \rho(|| \symbf{r}_{\mathcal{C}}(\hat{\symbf{z}}_{l}^{c_j}, \mathcal{X}) ||^2_{\symbf{P}_{l}^{c_j}}) \end{Bmatrix},
+  \min_{\mathcal{X}} \begin{Bmatrix} \| \symbf{r}_p - \symbf{H}_p \cdot \mathcal{X} \|^2 + \sum_{k\in\mathcal{B}} \| \symbf{r}_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) \|^2_{\symbf{P}_{b_k}^{b_{k+1}}} + \sum_{(l,j)\in\mathcal{C}} \rho(\| \symbf{r}_{\mathcal{C}}(\hat{\symbf{z}}_{l}^{c_j}, \mathcal{X}) \|^2_{\symbf{P}_{l}^{c_j}}) \end{Bmatrix},
 \end{equation}
-其中$\symbf{r}_p, \symbf{H}_p$代表与边缘化相关的观测与矩阵，$\symbf{r}_{\mathcal{C}}$代表视觉观测的残差函数，$\symbf{r}_{\mathcal{B}}$是本文提出的、增加了伪观测约束的IMU残差函数，$\symbf{P}_{l}^{c_j}$代表视觉观测的协方差矩阵，$\symbf{P}_{b_k}^{b_{k+1}}$代表伪观测约束的协方差矩阵，$\symbf{r}'_{\mathcal{B}}$具体可以表示为
+其中$\symbf{r}_p, \symbf{H}_p$代表与边缘化相关的观测与矩阵，$\symbf{r}_{\mathcal{C}}$代表视觉观测的残差函数，$\symbf{r}_{\mathcal{B}}$是本文提出的、增加了伪观测约束的IMU残差函数，$\symbf{P}_{l}^{c_j}$代表视觉观测的协方差矩阵，$\symbf{P}_{b_k}^{b_{k+1}}$代表伪观测约束的协方差矩阵，$\mathcal{B}$表示存在IMU残差的时刻集合，$\mathcal{C}$则表示地图点和视觉观测的匹配集合。$\symbf{r}'_{\mathcal{B}}$具体可以表示为
 \begin{equation}
   \symbf{r}_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) = 
   \begin{bmatrix} 

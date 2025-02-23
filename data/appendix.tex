@@ -3,6 +3,23 @@
 \chapter{补充内容}
 \label{appendix:quat}
 
+\section{罗德里格斯旋转公式}
+罗德里格斯旋转公式给定一个旋转矩阵 \( \symbf{R} \)，可以将其转换为旋转向量 \( \boldsymbol{\theta} = \theta \symbf{u} \)，其中 \( \theta \) 是旋转角度，\( \symbf{u} \) 是旋转轴的单位向量。旋转角度 \( \theta \)的计算方式如下：
+
+\begin{equation}
+\theta = \cos^{-1} \left( \frac{\text{trace}(\symbf{R}) - 1}{2} \right)
+\end{equation}
+其中，\( \text{trace}(\symbf{R}) \) 表示矩阵 \( \symbf{R} \) 的迹，即对角线元素之和。旋转轴 \( \symbf{u} \)是一个单位向量，其计算方式为：
+\begin{equation}
+\symbf{u} = \frac{1}{2 \sin \theta} \begin{bmatrix}
+R_{32} - R_{23} \\
+R_{13} - R_{31} \\
+R_{21} - R_{12}
+\end{bmatrix}
+\end{equation}
+其中，\( R_{ij} \) 表示矩阵 \( \symbf{R} \) 的第 \( i \) 行第 \( j \) 列元素。
+
+
 附录是与论文内容密切相关、但编入正文又影响整篇论文编排的条理和逻辑性的资料，例如某些重要的数据表格、计算程序、统计表等，是论文主体的补充内容，可根据需要设置。
 
 附录中的图、表、数学表达式、参考文献等另行编序号，与正文分开，一律用阿拉伯数字编码，
