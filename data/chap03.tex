@@ -2,6 +2,8 @@
 
 \chapter{视觉惯性里程计}
 
+本章主要对视觉惯性里程计模块进行介绍。本文中的视觉惯性里程计不同于通用的里程计，其专门针对车辆或者轮式机器人进行了优化，针对这类平台的运动状态进行了假设与分类，并根据俄分类情况分别提出了相应的速度伪观测约束条件。在状态的检测方面，本章介绍了一种基于深度学习的方法。在约束条件的使用方面，本章设计了粗对齐过程并在原有的后端优化中加入了惯性-车体因子。
+
 \section{整体设计}
 视觉惯性里程计是视觉惯性定位中的关键组成部分，其主要工作是为定位提供较为精确的帧间运动关系约束，这对于最终的定位精度有着不可忽视的作用。视觉惯性里程计常用于无人机、自动驾驶车辆和机器人等领域，传统的视觉惯性里程计一般考虑机体做任意运动，因此仅构建了惯性和视觉观测之间的约束关系。而然，在固定路线的定位中，机体的运动往往自身同样具有一定的伪观测约束：本文考虑的汽车和轮式机器人，其运动往往在平面上进行，因此其速度一般可以分解为沿着车辆前进方向的速度和沿着车身横向的速度。如图~\ref{fig:vehicle}所示，实线代表IMU体坐标系$(\cdot)^{b_{j}}$，虚线代表车身坐标系$(\cdot)^{v_{j}}$，车身坐标系的$y$轴沿着车辆前进方向，$x$轴沿着车辆横向方向，$z$轴垂直于地面向上。IMU体坐标系即IMU的测量坐标系，其一般状态下与车身坐标系会存在一定的旋转关系，并不一定如图所示的共向。
 
@@ -148,13 +150,6 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 
 \subsection{网络训练}
 
-对于网络训练，需要明确的问题主要包括数据清洗、预测真值生成、损失函数设计和训练策略。
-在数据清洗方面，由于IMU采样数据包括加速度和角速度，这两类数据的数值分布有较大差异：角速度以$rad/s$为单位，一般是一个较小的数字，加速度以$m/s^2$为单位，其取值范围一般较大。因此如果使用原始数据作为网络输入，往往会造成网络训练的不稳定，因此本文使用归一化策略，将所有的IMU采样数据元素调整为值域在$(-1, 1)$之间：首先根据训练数据的分布特征计算IMU采样数据的均值$\symbf{\mu}\in \mathbb{R}^6$和逐元素标准差$\symbf{\sigma}\in \mathbb{R}^6$，然后对每一条IMU数据根据
-\begin{equation}
-  \symbf{x}' = \frac{\symbf{x} - \symbf{\mu}}{\symbf{\sigma}}
-\end{equation}
-进行转换。$\symbf{x}$是一条包涵加速度和角速度的IMU数据，除法是逐元素除法，可以在相同形状的的数据上进行操作。
-
 \renewcommand{\algorithmicrequire}{\textbf{输入：}\unskip}
 \renewcommand{\algorithmicensure}{\textbf{输出：}\unskip}
 \begin{algorithm}
@@ -192,7 +187,17 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \end{algorithmic}
 \end{algorithm}
 
+对于网络训练，需要明确的问题主要包括数据清洗、预测真值生成、损失函数设计和训练策略。
+在数据清洗方面，由于IMU采样数据包括加速度和角速度，这两类数据的数值分布有较大差异：角速度以$rad/s$为单位，一般是一个较小的数字，加速度以$m/s^2$为单位，其取值范围一般较大。因此如果使用原始数据作为网络输入，往往会造成网络训练的不稳定，因此本文使用归一化策略，将所有的IMU采样数据元素调整为值域在$(-1, 1)$之间：首先根据训练数据的分布特征计算IMU采样数据的均值$\symbf{\mu}\in \mathbb{R}^6$和逐元素标准差$\symbf{\sigma}\in \mathbb{R}^6$，然后对每一条IMU数据根据
+\begin{equation}
+  \symbf{x}' = \frac{\symbf{x} - \symbf{\mu}}{\symbf{\sigma}}
+\end{equation}
+进行转换。$\symbf{x}$是一条包涵加速度和角速度的IMU数据，除法是逐元素除法，可以在相同形状的的数据上进行操作。
+
 在预测真值生成方面，本文需要使用到车辆的真实运动状态。具体来说，首先根据车辆的真实运动状态的更新频率切分IMU序列，然后根据车身运动状态自动生成真值$\symbf{z}$。根据对预设状态的分类，首先根据相对位置信息判断车辆是否静止，然后根据相对旋转判断车辆是否直线行驶，具体如算法~\ref{alg1}所示，其中第16行即罗德里格斯旋转公式(Rodrigues' rotation formula)\cite{dai2015euler}将旋转矩阵转换为旋转向量，其具体过程详见附录~\ref{appendix:quat}，$\text{norm}(\cdot)$表示对向量取模操作。
+
+
+在损失函数和训练策略方面，由于模型的最终输出会使用Sigmoid函数进行概率预测，相对应的损失函数选择二值交叉熵损失函数(Binary Cross Entropy, BCE)。在训练策略方面，本文使用Adam优化器\cite{kingma2014adam}，学习率为$1e-4$，训练批次大小为8，训练轮数为100。此外，由于一般情况下车辆直行的情况比静止和转弯的情况要多，如图~\ref{fig:data_distrib}所示，因此如果直接使用全部数据训练，则会导致样本分布的不均衡。为了解决这个问题，本文在数据采样方面使用了均衡策略：在训练的每个epoch中，以转弯和静止区间的并集数据量为基准，从直行数据中随机采样等量数据，然后与转弯和静止区间的并集数据合并。
 
 \begin{figure}
   \centering
@@ -201,8 +206,6 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \caption{车身状态分布情况}
   \label{fig:data_distrib}
 \end{figure}
-
-在损失函数和训练策略方面，由于模型的最终输出会使用Sigmoid函数进行概率预测，相对应的损失函数选择二值交叉熵损失函数(Binary Cross Entropy, BCE)。在训练策略方面，本文使用Adam优化器\cite{kingma2014adam}，学习率为$1e-4$，训练批次大小为8，训练轮数为100。此外，由于一般情况下车辆直行的情况比静止和转弯的情况要多，如图~\ref{fig:data_distrib}所示，因此如果直接使用全部数据训练，则会导致样本分布的不均衡。为了解决这个问题，本文在数据采样方面使用了均衡策略：在训练的每个epoch中，以转弯和静止区间的并集数据量为基准，从直行数据中随机采样等量数据，然后与转弯和静止区间的并集数据合并。
 
 \section{伪观测预处理}
 
@@ -235,48 +238,39 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \end{aligned},
 \end{equation}
 其中的约束条件是为了保证所求旋转矩阵是一个合法的旋转矩阵。针对上述优化问题，其求解过程如下：
-\begin{equation}
-\begin{aligned}
+\begin{align}
   2\symbf{J} &= \sum_{j=1}^{n} \| \symbf{v}^{v_{j}} - \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} \|_2^2 \\ 
   &= \sum_{j=1}^{n} {(\symbf{v}^{v_{j}} - \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}})}^T \cdot {(\symbf{v}^{v_{j}} - \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}})} \\
   &= \sum_{j=1}^{n} {({\symbf{v}^{v_{j}}}^T - {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T)} \cdot {(\symbf{v}^{v_{j}} - \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}})} \\
-  &= \sum_{j=1}^{n} ({\symbf{v}^{v_{j}}}^T \cdot \symbf{v}^{v_{j}} - {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} - {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot {\symbf{v}^{v_{j}}} + {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}})
-\end{aligned},
-\end{equation}
+  &= \sum_{j=1}^{n} ({\symbf{v}^{v_{j}}}^T \cdot \symbf{v}^{v_{j}} - {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} - {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot {\symbf{v}^{v_{j}}} + {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}}),
+\end{align}
 根据约束条件${(\symbf{R}_{b}^{v})}^T \symbf{R}_{b}^{v} = \symbf{I}$可得
-\begin{equation}
-\begin{aligned}
+\begin{align}
   2\symbf{J} &= \sum_{j=1}^{n} ({\symbf{v}^{v_{j}}}^T \cdot \symbf{v}^{v_{j}} - {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} - {\symbf{v}^{b_{j}}}^T \cdot {\symbf{R}_{b}^{v}}^T \cdot {\symbf{v}^{v_{j}}} + {\symbf{v}^{b_{j}}}^T \cdot \symbf{v}^{b_{j}}) \\ 
   &= \sum_{j=1}^{n} (\| \symbf{v}^{v_{j}} \|^2 - 2\cdot {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} + \| \symbf{v}^{b_{j}} \|^2) \\
-  &= \sum_{j=1}^{n} (\| \symbf{v}^{v_{j}} \|^2 + \| \symbf{v}^{b_{j}} \|^2) - 2 \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}}
-\end{aligned},
-\end{equation}
+  &= \sum_{j=1}^{n} (\| \symbf{v}^{v_{j}} \|^2 + \| \symbf{v}^{b_{j}} \|^2) - 2 \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}},
+\end{align}
 可以观察到此时$\symbf{J}$的最小化与前一常数项无关，仅与后项带$\symbf{R}_b^v$的项有关，因此可以将$\symbf{J}$的最小化问题转化为最大化后一项，即
 \begin{equation}
   \max_{\symbf{R}_{b}^{v}} \symbf{J}' = \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}}.
 \label{eq:max}
 \end{equation}
 注意到
-\begin{equation}
-\begin{aligned}
+\begin{align}
   \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} &= \text{trace}({\symbf{V}^{v}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{V}^{b}) \\ 
-  &= \text{trace}( \symbf{R}_{b}^{v} \cdot \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T)
-\end{aligned},
-\label{eq:trace}
-\end{equation}
+  &= \text{trace}( \symbf{R}_{b}^{v} \cdot \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T), \label{eq:trace}
+\end{align}
 其中$\symbf{V}^{b}, {\symbf{V}^{v}}^T$分别是$\{\symbf{v}^{b_{j}}\}^n,\{\symbf{v}^{v_{j}}\}^n$序列的协方差矩阵。对$\symbf{V}^{b} \cdot {\symbf{V}^{v}}^T$进行奇异值分解(Singular Value Decomposition, SVD)可以获得
 \begin{equation}
   \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T = \symbf{U} \cdot \symbf{\Sigma} \cdot \symbf{V}^T,
-\end{equation}
-因此可以对式~\ref{eq:trace}进行变换得到
-\begin{equation}
-\begin{aligned}
-  \text{trace}( \symbf{R}_{b}^{v} \cdot \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T) &= \text{trace}(\symbf{R}_{b}^{v} \cdot \symbf{U} \cdot \symbf{\Sigma} \cdot \symbf{V}^T) \\
-  &= \text{trace}(\symbf{\Sigma} \cdot \symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U})
-\end{aligned},
 \label{eq:svd}
 \end{equation}
-其中$\symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U}$为三个正交矩阵的乘积，因此仍是一个正交矩阵，而$\symbf{\Sigma}$为对角矩阵。根据正交矩阵的性质可知其内部所有元素均小于1(因为正交矩阵的行列式为1)，所以对于$\text{trace}(\symbf{\Sigma} \cdot \symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U})$来说，其取得最大值时即$\symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U}$为单位矩阵。结合式~\ref{eq:max}，式~\ref{eq:trace}，式~\ref{eq:svd}可知，最大化$\symbf{J}'$时即
+因此可以对式~\eqref{eq:trace}进行变换得到
+\begin{align}
+  \text{trace}( \symbf{R}_{b}^{v} \cdot \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T) &= \text{trace}(\symbf{R}_{b}^{v} \cdot \symbf{U} \cdot \symbf{\Sigma} \cdot \symbf{V}^T) \\
+  &= \text{trace}(\symbf{\Sigma} \cdot \symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U}),
+\end{align}
+其中$\symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U}$为三个正交矩阵的乘积，因此仍是一个正交矩阵，而$\symbf{\Sigma}$为对角矩阵。根据正交矩阵的性质可知其内部所有元素均小于1(因为正交矩阵的行列式为1)，所以对于$\text{trace}(\symbf{\Sigma} \cdot \symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U})$来说，其取得最大值时即$\symbf{V}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{U}$为单位矩阵。结合式~\eqref{eq:max}，式~\eqref{eq:trace}，式~\eqref{eq:svd}可知，最大化$\symbf{J}'$时即
 \begin{equation}
   \symbf{R}_{b}^{v} = \symbf{V} \cdot \symbf{U}^T.
 \end{equation}
@@ -297,7 +291,10 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 
 根据以上的状态估计量，可以得到视觉惯性里程计的优化目标函数
 \begin{equation}
-  \min_{\mathcal{X}} \begin{Bmatrix} \| \symbf{r}_p - \symbf{H}_p \cdot \mathcal{X} \|^2 + \sum_{k\in\mathcal{B}} \| \symbf{r}_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) \|^2_{\symbf{P}_{b_k}^{b_{k+1}}} + \sum_{(l,j)\in\mathcal{C}} \rho(\| \symbf{r}_{\mathcal{C}}(\hat{\symbf{z}}_{l}^{c_j}, \mathcal{X}) \|^2_{\symbf{P}_{l}^{c_j}}) \end{Bmatrix},
+  \min_{\mathcal{X}} 
+  \begin{Bmatrix} 
+  \| \symbf{r}_p - \symbf{H}_p \cdot \mathcal{X} \|^2 + \sum_{k\in\mathcal{B}} \| \symbf{r}_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) \|^2_{\symbf{P}_{b_k}^{b_{k+1}}}
+  + \sum_{(l,j)\in\mathcal{C}} \rho(\| \symbf{r}_{\mathcal{C}}(\hat{\symbf{z}}_{l}^{c_j}, \mathcal{X}) \|^2_{\symbf{P}_{l}^{c_j}}) \end{Bmatrix},
 \end{equation}
 其中$\symbf{r}_p, \symbf{H}_p$代表与边缘化相关的观测与矩阵，$\symbf{r}_{\mathcal{C}}$代表视觉观测的残差函数，$\symbf{r}_{\mathcal{B}}$是本文提出的、增加了伪观测约束的IMU残差函数，$\symbf{P}_{l}^{c_j}$代表视觉观测的协方差矩阵，$\symbf{P}_{b_k}^{b_{k+1}}$代表伪观测约束的协方差矩阵，$\mathcal{B}$表示存在IMU残差的时刻集合，$\mathcal{C}$则表示地图点和视觉观测的匹配集合。$\symbf{r}'_{\mathcal{B}}$具体可以表示为
 \begin{equation}
@@ -323,13 +320,12 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \end{equation}
 其中$\symbf{e}_i$表示单位矩阵的第$i$列向量，$\symbf{y}^{FOR}, \symbf{y}^{LAT}$分别表示预测的车辆前进和横向的状态。
 
-若使用伪观测约束，需要使用其相对于各估计量的雅可比矩阵。为了简化表达，本处使用$\symbf{r}'_{\mathcal{B}}$代表IMU残差函数中的伪观测约束，即式~\ref{eq:imu_residual}的最后一项。首先给出速度伪观测约束相对于状态量$\symbf{v}_{b_{k}}^o$的雅可比矩阵
+若使用伪观测约束，需要使用其相对于各估计量的雅可比矩阵。为了简化表达，本处使用$\symbf{r}'_{\mathcal{B}}$代表IMU残差函数中的伪观测约束，即式~\eqref{eq:imu_residual}的最后一项。首先给出速度伪观测约束相对于状态量$\symbf{v}_{b_{k}}^o$的雅可比矩阵
 \begin{equation}
   \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{v}_{b_{k}}^o} = \symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{R}_{b_k}^o}^{-1}.
 \end{equation}
 对于$\symbf{q}_{b_{k}}^o$的雅可比矩阵，约束中并没有直接使用四元数$\symbf{q}_{b_{k}}^o$，而是使用等价的旋转矩阵$\symbf{R}_{b_{k}}^o$，避免了四元数运算$\otimes$的繁琐使用。求导方式本文选择使用扰动模型\cite{imu_preintegration}进行，假设旋转的扰动值为$\symbf{\varphi } \in \mathbb{R}^3$(对于四元数和旋转矩阵有同样的效果)，则：
-\begin{equation}
-\begin{aligned}
+\begin{align}
   \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{q}_{b_{k}}^o} &\triangleq  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{\varphi }} \\
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {\text{exp}(\symbf{\varphi }^{\land}) \cdot {\symbf{R}_{b_k}^o}^{-1}} \cdot \symbf{v}_{b_k}^o - \symbf{A} \cdot \symbf{R}_b^v \cdot {{\symbf{R}_{b_k}^o}^{-1}} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }} \\
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {\text{exp}(\symbf{\varphi }^{\land}) \cdot \symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o - \symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }} \\
@@ -338,9 +334,8 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{\varphi }^{\land} \cdot \symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }}
   = \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{-\symbf{A} \cdot \symbf{R}_b^v \cdot ({\symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^{o})^{\land} \cdot \symbf{\varphi}}{\symbf{\varphi }} \\
   &= -\symbf{A} \cdot \symbf{R}_b^v \cdot ({\symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^{o})^{\land}
-  = -\symbf{A} \cdot \symbf{R}_b^v \cdot ({\symbf{R}_{b_k}^o}^{-1} \cdot \symbf{v}_{b_k}^{o})^{\land}
-\end{aligned},
-\end{equation}
+  = -\symbf{A} \cdot \symbf{R}_b^v \cdot ({\symbf{R}_{b_k}^o}^{-1} \cdot \symbf{v}_{b_k}^{o})^{\land},
+\end{align}
 其中${\land}$表示将一个向量转换为反对称矩阵的函数，在推导中直接使用了近似
 \begin{equation}
   \text{exp}(\symbf{\varphi }^{\land}) \approx \symbf{I} + \symbf{\varphi }^{\land}.

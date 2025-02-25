@@ -1,0 +1,56 @@
+% !TeX root = ../thuthesis-example.tex
+
+\chapter{固定路线中视觉惯性定位系统搭建与测试}
+
+
+% Please add the following required packages to your document preamble:
+% \usepackage{multirow}
+\begin{table}[]
+  \centering
+  \begin{tabular}{c|c|ccccc}
+  \toprule
+  \textbf{Method} & \textbf{Type}           & \textbf{OL1} & \textbf{OL2} & \textbf{OL3} & \textbf{OL4} & \textbf{OL5} \\ \midrule
+  OKVIS2          & \multirow{6}{*}{VIO}    & \multicolumn{5}{c}{\textgreater{}300}                       \\
+  BASALT          &                         & \multicolumn{5}{c}{\textgreater{}300}                       \\
+  OpenVINS        &                         & 37.917951                                & 52.712329                                & 109.021385                               & N/A                                      & N/A                                      \\
+  VINS-Mono       &                         & 15.696389                                & 12.439054                                & \cellcolor[HTML]{FA7F6F}\textbf{16.389739}                                & 7.972945                                 & 13.211903                                \\
+  ORB-SLAM3       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FA7F6F}\textbf{6.931078}                                 \\
+  Ours            &                         & \cellcolor[HTML]{FA7F6F}\textbf{8.847395}                                 & \cellcolor[HTML]{FA7F6F}\textbf{4.343367}                                 & 18.312372                                & \cellcolor[HTML]{FA7F6F}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
+  DSO+IMU         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
+  OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}300}                         \\
+  BASALT          &                         & \multicolumn{5}{c}{\textgreater{}300}                         \\
+  OpenVINS        &                         & 37.917951                                & 52.712329                                & 109.021385                               & N/A                                      & N/A                                      \\
+  VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
+  ORB-SLAM3       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FA7F6F}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FA7F6F}\textbf{5.520636}                                 \\
+  Ours            &                         & \cellcolor[HTML]{FA7F6F}\textbf{3.834251}                                 & \cellcolor[HTML]{FA7F6F}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FA7F6F}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
+  \end{tabular}
+  \end{table}
+
+  \begin{table}
+  \centering
+  \begin{tabular}{ccccc}
+  \toprule
+  \textbf{方法}           & \textbf{OL2}      & \textbf{OL3}      & \textbf{OL4}      & \textbf{OL5}      \\ \midrule
+  VINS-Mono           & 7.878626          & 10.664015         & 7.661955          & 8.083566          \\
+  VINS-Fusion+RTK     & 1.801669          & 2.000104          & \cellcolor[HTML]{FA7F6F}\textbf{1.809687}          & 2.448607          \\
+  VINS-Mono+MonoMap   & 3.092430          & N/A               & N/A               & N/A               \\
+  VINS-Mono+FusionMap & 2.440850          & N/A               & N/A               & N/A               \\
+  ORB-SLAM3           & 15.621815         & 6.288431          & 5.073350          & 5.520636          \\
+  ORB-SLAM3+ORBMAP    & 19.249121         & N/A               & N/A               & N/A               \\
+  VLS                 & 1.715343          & 2.913034          & 4.515426          & 1.862401          \\
+  Ours                & \cellcolor[HTML]{FA7F6F}\textbf{0.777091} & \cellcolor[HTML]{FA7F6F}\textbf{0.938238} & 3.792201 & \cellcolor[HTML]{FA7F6F}\textbf{0.767040} \\ \bottomrule
+  \end{tabular}
+  \end{table}
+
+  \begin{table}
+  \centering
+  \begin{tabular}{ccccccc}
+  \toprule
+  \textbf{方法}       & \textbf{NH2}      & \textbf{NH3}      & \textbf{NH4}      & \textbf{NH5}      & \textbf{NH6}      & \textbf{NH7}      \\ \midrule
+  VINS-Fusion+RTK & 0.584860          & 0.557219          & 0.584881          & 0.708736          & 0.764223          & 1.098182          \\
+  ORB-SLAM3       & 3.896760          & 1.074461          & 3.326053          & 2.883349          & 4.258630          & 1.770878          \\
+  VINS-Mono       & 1.424692          & 3.227336          & 1.526516          & 2.821233          & 3.874702          & 1.720061          \\
+  VLS             & 0.385877          & 0.338285          & 0.336795          & 0.409525          & \cellcolor[HTML]{FA7F6F}\textbf{0.463320} & 0.304587          \\
+  Ours            & \cellcolor[HTML]{FA7F6F}\textbf{0.325610} & \cellcolor[HTML]{FA7F6F}\textbf{0.323113} & \cellcolor[HTML]{FA7F6F}\textbf{0.303237} & \cellcolor[HTML]{FA7F6F}\textbf{0.377129} & 0.494464          & \cellcolor[HTML]{FA7F6F}\textbf{0.291957} \\ \bottomrule
+  \end{tabular}
+  \end{table}
