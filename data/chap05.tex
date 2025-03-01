@@ -1,56 +1,355 @@
 % !TeX root = ../thuthesis-example.tex
+\externaldocument{chap02}
+\externaldocument{chap03}
+\externaldocument{chap04}
+
 
 \chapter{固定路线中视觉惯性定位系统搭建与测试}
 
+\section{系统搭建细节}
+
+本文所设计的定位系统的运行环境依赖于同时具有CPU(Central processing unit)和GPU(Graphics processing unit)的计算机，具体来说本文所实验的平台使用12th Gen Intel(R) Core(TM) i7-12700 CPU和NVIDIA GeForce RTX 3080 GPU。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{Ubuntu 20.04 LTS}{\includegraphics[width=0.22\linewidth]{ubuntu_logo.png}}
+  \subcaptionbox*{ROS Noetic}{\includegraphics[width=0.18\linewidth]{noetic_logo.png}}
+  \subcaptionbox*{VINS-Mono}{\includegraphics[width=0.22\linewidth]{VINS_logo.jpeg}}
+  \subcaptionbox*{TensorRT}{\includegraphics[width=0.3\linewidth]{tensorrt_logo.png}}
+  \caption{软件部署环境}
+  \label{fig:software}
+\end{figure}
+
+系统的软件部署环境如图~\ref{fig:software} 所示，其中Ubuntu 20.04 LTS是本文所使用的操作系统；ROS Noetic是本文所使用的机器人操作系统，其主要作用是将多个子系统的结果方便快捷得统一处理；VINS-Mono是本文所使用的视觉惯性定位系统的基线，其具有较为简洁的逻辑划分，方便快速改进、验证想法；TensorRT是本文所使用的深度学习推理框架，其主要负责系统中的神经网络推理任务，其针对NVIDIA显卡的速度优化使得整个系统可以实时运行。此外，本文所设计系统中还有大量超参数，其具体取值如表~\ref{tab:hyperparameters} 所示。
+
+\begin{table}
+\centering
+\caption{本文中所涉及的运行超参数}
+\begin{tabular}{cccc}
+\toprule
+参数名 & 首次出现章节 & 作用 & 取值 \\
+\midrule
+$\alpha$ &  \ref{sec:map_fusion}  & 建图融合权重系数     & 1000 \\
+$N_c$ & \ref{sec:c2f_loc}  & 粗到细匹配候选关键帧数量 & 7   \\
+$t_r$ &  \ref{sec:c2f_loc}  & 投票过程相对旋转角度阈值 & $15\degree$   \\
+$t_p$ &  \ref{sec:c2f_loc}  & 投票过程相对位移阈值   & 5m    \\
+$\lambda_r$ &  \ref{sec:valid}  & 有效性验证角度阈值    & $60\degree$   \\
+$\lambda_p$ &  \ref{sec:valid}  & 有效性验证位移阈值    & 15m   \\
+$N$ &  \ref{sec:tight_opt}  & 滑动窗口容量       & 20   \\
+$\kappa$ &  \ref{sec:tight_opt}  & 单帧图像所考虑的点云比例 & 10  \\
+\bottomrule
+\end{tabular}
+\label{tab:hyperparameters}
+\end{table}
+
+\section{数据集与评价指标}
+\subsection{KITTI数据集}
+KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎的数据集之一，它包含多个小时的交通场景数据，这些数据通过多种传感器采集，包括高分辨率RGB立体相机、灰度立体相机以及3D激光扫描仪。该数据集提供了11条经过精心选择的序列，构成视觉里程计基准。每条序列包含来自四个相机的数据：两个灰度相机和两个彩色相机。此外，KITTI 数据集还为这11条视觉里程计基准序列中的10条提供了原始GNSS观测数据和IMU测量数据。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{序列00-城镇环境}{\includegraphics[width=0.47\linewidth]{kitti_00.png}}
+  \subcaptionbox*{序列01-高架环境}{\includegraphics[width=0.47\linewidth]{kitti_01.png}}
+  \subcaptionbox*{序列09-郊外环境}{\includegraphics[width=0.47\linewidth]{kitti_09.png}}
+  \subcaptionbox*{序列10-农村环境}{\includegraphics[width=0.47\linewidth]{kitti_10.png}}
+  \caption{KITTI数据集场景}
+  \label{fig:kitti_data}
+\end{figure}
+
+本文使用KITTI视觉里程计基准中包含GNSS观测数据的10条序列，评估本文所提出系统的建图性能以及整体性能。这10条序列包括了城镇、高架、郊外以及农村等常见的车辆行驶环境，如图~\ref{fig:kitti_data} 所示。
+
+\subsection{4Seasons数据集}
+4Seasons数据集\cite{wenzel20214seasons}是一个专为自动驾驶研究设计的数据集，提供了涵盖季节变化和复杂感知条件的图像、IMU等数据。同一路径在不同季节和多种感知条件下被多次采集，使其特别适合于评估针对固定路径设计的方法。该数据集使用的传感器包括立体相机、IMU和RTK-GNSS，同时还提供了精度达到厘米级的高精度真值位姿。
+
+与KITTI数据集相比，4Seasons数据集能够提供更具挑战性和说服力的实验结果，突出了本文方法的优势。本文选择了四个具有代表性的场景，分别是
+
+\textbf{(1)Office Loop (OF):} 位于城郊工业区的环形路线，包含了多种感知条件，如建筑物、树木和道路标志等，如图~\ref{fig:OF_data} 所示。此路线在不同季节采集了5条序列(以OF1-5代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\begin{figure}
+  \centering
+  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{OfficialLoop.png}}
+  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OF1.png}}
+  \caption{Office Loop场景}
+  \label{fig:OF_data}
+\end{figure}
+
+\textbf{(2) Neighborhood (NH):} 位于城镇环境的环形路线，包含了多种感知条件，如树木和房屋等，包含了更多的植被，接近于农村环境，如图~\ref{fig:NH_data} 所示。此路线在不同季节采集了7条序列(以NH1-7代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{Neighborhood.png}}
+  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_NH01.png}}
+  \caption{Neighborhood场景}
+  \label{fig:NH_data}
+\end{figure}
+
+\textbf{(3) Business Campus (BC):} 位于校园和商业区的多条环形路线，包含了更多的建筑物，如图~\ref{fig:BC_data} 所示。此路线在不同季节采集了3条序列(以BC1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{BusinessCampus.png}}
+  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_BC1.png}}
+  \caption{Business Campus场景}
+  \label{fig:BC_data}
+\end{figure}
+
+\textbf{(4) Old Town (OT):} 位于城市中心的商业区，包含了多种感知条件，此外还有大量的移动物体，如汽车、行人和自行车等，如图~\ref{fig:OT_data} 所示。此路线在不同季节采集了3条序列(以OT1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{OldTown.png}}
+  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OT1.png}}
+  \caption{Old Town场景}
+  \label{fig:OT_data}
+\end{figure}
+
+\subsection{数据集划分}
+
+由于本文需要分别验证3个模块的效果，因此本文将数据集的划分总结如表~\ref{tab:dataset_usage} 所示。表中的每一列代表了一个测试模块，每一行代表了一个数据集，表中的符号代表了数据集的使用方法，其中{\color[HTML]{3166FF} $\bigcirc$}代表使用该序列进行训练或者建图，{\color[HTML]{FD6864}$\bigtriangleup$}代表使用该序列进行测试。
+
+\begin{table}
+\centering
+\caption{数据集使用划分}
+\begin{tabular}{c|cc|cccc}
+\toprule
+\multirow{2}{*}{测试模块} & \multicolumn{2}{c|}{KITTI}               & \multicolumn{4}{c}{4Seasons}                                            \\ \cline{2-7} 
+                  & 灰色                          & 彩色         & OF1              & OF2-5            & NH1; BC1; OT1 & NH2-7;BC2-3;OT2-3 \\ \midrule
+离线建图 & {\color[HTML]{3166FF} $\bigcirc$}{\color[HTML]{FD6864}$\bigtriangleup$} &            &                  &                  &               &                   \\
+视觉惯性里程计           &                             &            & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    &                   \\
+紧耦合地图定位           & {\color[HTML]{FD6864}$\bigtriangleup$}           & {\color[HTML]{3166FF} $\bigcirc$} & {\color[HTML]{3166FF} $\bigcirc$}       & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    & {\color[HTML]{FD6864}$\bigtriangleup$}  \\ \bottomrule
+\end{tabular}
+\label{tab:dataset_usage}
+\begin{tablenotes}
+  \footnotesize
+  \item {\color[HTML]{3166FF} $\bigcirc$} 代表使用该序列进行训练或者建图；{\color[HTML]{FD6864}$\bigtriangleup$} 代表使用该序列进行测试
+\end{tablenotes}
+\end{table}
+
+KITTI数据集参与离线建图和紧耦合地图定位两个模块的测试：在评估建图过程时，使用来自单目灰度相机的完整图像集；在评估整体性能时由于KITTI数据集未直接提供沿同一路径的多次行驶数据，本文中通过使用不同的相机模拟多次行驶。具体而言，使用部分彩色相机拍摄的图像进行离线建图过程，然后使用灰度相机拍摄的图像测试紧耦合地图定位的精度。建图图像的比例设置为0.25，即只使用四分之一的彩色图像来构建先验地图，并在完整的灰度图像集上进行定位。
+
+4Seasons数据集参与视觉惯性里程计和紧耦合地图定位两个模块的测试：在评估视觉惯性里程计时，使用NH1、BC1和OT1的数据作为训练数据，OF1-5作为测试数据；在评估紧耦合地图定位性能时，使用OF1、NH1、BC1和OT1作为建图数据，OF2-5、NH2-7、BC2-3和OT2-3作为测试数据。此外由于紧耦合地图定位模块需要使用视觉惯性里程计结果，而视觉惯性里程计的训练数据与紧耦合地图定位的测试数据没有重合，所以可以直接使用视觉惯性里程计的结果作为紧耦合地图定位的输入而不需要担心训练数据中混入了测试数据。
+
+\subsection{评价指标}
+
+本文实验中使用三种不同的指标来评估定位性能：绝对轨迹误差(Absolute Translation Error, ATE)\cite{sturm2012benchmark}和相对位姿误差(Relative Pose Error, RPE)\cite{geiger2012we}。其中绝对轨迹误差只评估位移分量，记做$ATE_t$，单位为米(m)；相对位姿误差评估了相对平移和相对旋转的误差，分别记做$RPE_{t}$和$RPE_{r}$，单位分别为米/100米(m/100m)和度/100米($\degree$/100m)，$RPE_{t}$的计算是在每100米的间隔中计算当前定位结果与真值(Ground Truth)的平移误差，$RPE_{r}$的计算是在每100米的间隔中计算当前定位结果与真值之间的旋转角度误差。
+
+$ATE_t$的计算方式为可以表示为：
+\begin{equation}
+  ATE_t = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\|\text{trans}(\symbf{T}_{gt,i}^{-1}\cdot \symbf{T}_{est,i})\|^{2}_{2}},
+\end{equation}
+其中$\text{trans}(\cdot)$表示提取转换矩阵的平移部分$\symbf{T}_{gt,i}, \symbf{T}_{est,i}$分别表示位姿的真值和预测值。由于绝对轨迹误差的计算对于坐标系的选择较为敏感，因此每次计算前会首先使用Umeyama算法\cite{arun1987least}将估计的轨迹与真值轨迹对齐。
+
+$RPE_{t}$和$RPE_{r}$的计算方式分别为：
+\begin{align}
+  RPE_{t} &= \sqrt{\frac{1}{|\mathcal{S}|}\sum_{(i,j) \in \mathcal{S}}\| \text{trans}\left ((\symbf{T}_{gt,j}^{-1} \cdot \symbf{T}_{gt,i})^{-1}\cdot (\symbf{T}_{est,j}^{-1} \cdot \symbf{T}_{est,i}) \right ) \|_2^2} \\
+  RPE_{r} &= \sqrt{\frac{1}{|\mathcal{S}|}\sum_{(i,j) \in \mathcal{S}}\| \text{rot}\left ((\symbf{T}_{gt,j}^{-1} \cdot \symbf{T}_{gt,i})^{-1}\cdot (\symbf{T}_{est,j}^{-1} \cdot \symbf{T}_{est,i}) \right ) \|_2^2},
+\end{align}
+其中$\text{rot}(\cdot)$表示提取转换矩阵的旋转部分，$\mathcal{S}$表示相对位姿误差计算的间隔为100米的两帧集合。相对位姿误差的计算方式更加追求描述相对变换，能更好反映出里程计的性能。此外相对位姿误差的计算方式对于坐标系的选择不如绝对轨迹误差敏感，但也有一定要求，本文使用\citet{li2023textslam}提出的方法首先对估计的轨迹与真值轨迹对齐，然后再计算相应数值。
+
+接下来的实验结果汇报均使用以上三种指标，并且除了轨迹的对齐部分意外，均使用\citet{grupp2017evo}提出的开源工具包EVO进行计算。
+
+\section{先验地图构建效果}
+对于离线建图性能，本文以地图关键帧的位姿评估来定量对比建图精度。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。
+
+\begin{table}[]
+\centering
+\caption{KITTI数据集建图$ATE_t$\textdownarrow{}对比}
+\setlength{\tabcolsep}{5mm}
+\begin{tabular}{c|c|ccc}
+\toprule
+序列 & GNSS(上限) & COLMAP*\cite{schonberger2016structure} & VINS-Stereo\cite{qin2019a} & 离线建图          \\ \midrule
+00 & 0.03 & 5.61   & 5.95   & \cellcolor[HTML]{FA7F6F}\textbf{0.33} \\
+01 & 0.06 & N/A    & 6.49   & \cellcolor[HTML]{FA7F6F}\textbf{0.17} \\
+02 & 0.03 & N/A    & 5.99   & \cellcolor[HTML]{FA7F6F}\textbf{0.61} \\
+04 & 0.02 & 4.99   & 1.08   & \cellcolor[HTML]{FA7F6F}\textbf{0.54} \\
+05 & 0.02 & 8.28   & 5.98   & \cellcolor[HTML]{FA7F6F}\textbf{0.24} \\
+06 & 0.04 & 1.78   & 3.48   & \cellcolor[HTML]{FA7F6F}\textbf{1.55} \\
+07 & 0.03 & 3.41   & 2.41   & \cellcolor[HTML]{FA7F6F}\textbf{0.20} \\
+08 & 0.02 & N/A    & 3.85   & \cellcolor[HTML]{FA7F6F}\textbf{0.71} \\
+09 & 0.03 & 8.50   & 1.78   & \cellcolor[HTML]{FA7F6F}\textbf{0.50} \\
+10 & 0.03 & N/A    & 3.78   & \cellcolor[HTML]{FA7F6F}\textbf{0.79} \\ \bottomrule
+\end{tabular}
+\label{tab:map_ate}
+\begin{tablenotes}
+  \footnotesize
+  \item 星号*表示COLMAP的结果经过了尺度调整；VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量
+\end{tablenotes}
+\end{table}
 
 % Please add the following required packages to your document preamble:
 % \usepackage{multirow}
+\begin{table}
+\centering
+\caption{KITTI数据集建图RPE\textdownarrow{}对比}
+\begin{tabular}{c|ccc|ccc}
+\toprule
+\multirow{2}{*}{序列} & \multicolumn{3}{c|}{$RPE_t \downarrow$}              & \multicolumn{3}{c}{$RPE_r\downarrow$}                    \\ \cline{2-7} 
+                    & COLMAP & VINS-Stereo & 离线建图          & COLMAP       & VINS-Stereo & 离线建图  \\
+\midrule
+00                  & 1.91    & 3.45        & \cellcolor[HTML]{FA7F6F}\textbf{1.20} & 0.82          & 1.45        & \cellcolor[HTML]{FA7F6F}\textbf{0.69} \\
+01                  & N/A     & 12.18       & \cellcolor[HTML]{FA7F6F}\textbf{0.84} & N/A           & 3.54        & \cellcolor[HTML]{FA7F6F}\textbf{0.13} \\
+02                  & N/A     & 2.65        & \cellcolor[HTML]{FA7F6F}\textbf{0.63} & N/A           & 1.26        & \cellcolor[HTML]{FA7F6F}\textbf{0.27} \\
+04                  & 4.12    & 2.71        & \cellcolor[HTML]{FA7F6F}\textbf{0.71} & \cellcolor[HTML]{FA7F6F}\textbf{0.11} & 0.62        & 0.14          \\
+05                  & 1.75    & 1.41        & \cellcolor[HTML]{FA7F6F}\textbf{1.10} & 0.22          & 0.69        & \cellcolor[HTML]{FA7F6F}\textbf{0.19} \\
+06                  & 1.37    & 1.33        & \cellcolor[HTML]{FA7F6F}\textbf{0.86} & 0.20          & 0.72        & \cellcolor[HTML]{FA7F6F}\textbf{0.17} \\
+07                  & 1.16    & 1.17        & \cellcolor[HTML]{FA7F6F}\textbf{0.39} & 0.26          & 0.87        & \cellcolor[HTML]{FA7F6F}\textbf{0.24} \\
+08                  & N/A     & 3.46        & \cellcolor[HTML]{FA7F6F}\textbf{1.87} & N/A           & 1.77        & \cellcolor[HTML]{FA7F6F}\textbf{1.17} \\
+09                  & 0.86    & 4.45        & \cellcolor[HTML]{FA7F6F}\textbf{0.62} & 0.31          & 1.87        & \cellcolor[HTML]{FA7F6F}\textbf{0.25} \\
+10                  & N/A     & 2.38        & \cellcolor[HTML]{FA7F6F}\textbf{0.68} & N/A           & 0.94        & \cellcolor[HTML]{FA7F6F}\textbf{0.19} \\ \bottomrule
+\end{tabular}
+\label{tab:map_rpe}
+\begin{tablenotes}
+  \footnotesize
+  \item 星号*表示COLMAP的结果经过了尺度调整；VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量
+\end{tablenotes}
+\end{table}
+
+表中使用粗体和红底标出非GNSS观测值中的最佳性能结果，GNSS观测值可被视为位置建图精度的上限。此外，由于GNSS测量值仅提供平移信息而不包含旋转，实验仅在$ATE_t$指标下与GNSS测量值进行对比。
+
+COLMAP方法作为一个流行的SfM框架，代表了仅使用图像的建图性能。基础的COLMAP使用SIFT\cite{lowe2004distinctive}描述符进行建图，而本文的建图特征是基于深度神经网络。VINS-Stereo是VINS-Fusion的双目版本，VINS-Fusion是一种广泛使用的松耦合状态估计器，集成了视觉、惯性和GNSS测量。实验中使用双目图像输入，并结合GNSS测量，代表典型的GNSS辅助视觉建图方法。本文所提出的离线建图模块也是一种GNSS辅助视觉建图方法，其性能将与上述方法进行比较。
+
+VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地图，因此可以在所有指标上进行对比。但是COLMAP无法在没有额外位置先验的情况下重建真实世界尺度的地图，这使得直接比较绝对平移结果不公平。因此，实验中首先对COLMAP的轨迹应用Sim3变换调整框架和尺度，将其与真值对齐。Sim3变换参数通过最小化COLMAP位置信息与真值位置之间的最小二乘误差计算得到。对于相对旋转误差，COLMAP 的结果可以直接与其他方法对比。
+
+表\ref{tab:map_ate}和表\ref{tab:map_rpe}比较了ATE和RPE指标，结果表明本文的离线建图方法在所有候选方法中表现最佳。与COLMAP的对比表明，本文的建图方法在平移精度上显著提升了视觉建图性能。作为一种增量式SfM方法，COLMAP受到累计漂移的影响，导致平移精度较差。本文的方法通过结合GNSS位置先验约束了漂移，实验结果验证了其在降低绝对平移误差和相对平移误差方面的有效性。此外，通过表中数据可以发现COLMAP方法在许多序列上由于无法初始化前两帧图像而建图失败。而本文中基于深度学习的特征点可以可靠地完成初始化，体现了深度学习特征的优势。
+
+与VINS-Stereo的对比也表明，本文提出的方法优于松耦合的GNSS辅助视觉建图方法。VINS-Stereo尝试利用GNSS测量校正视觉SLAM的位置估计，但这种校正未直接影响位姿优化过程，而本文的方法将GNSS测量与视觉观测融合，使得平移先验能够直接影响位姿估计。因此，本文提出的建图方法在整体性能上表现最佳。
+
+在相对旋转误差$RPE_r$方面，本文方法在大多数序列中也表现出优越性能。相对旋转误差反映了位姿估计的准确性，本文方法和COLMAP都基于离线的三维重建方法，能够支持全局优化的计算成本，所以两种方的位姿估计精度相较于VINS-Stereo有明显提升。由于GNSS测量不提供旋转约束，本文的方法与COLMAP在旋转精度上的差异较小。
+
+\section{视觉惯性里程计效果}
+
+\subsection{车身状态判别效果}
+视觉惯性里程计的运行过程中使用到了车身状态结果，并且车身状态判别的结果对里程计精度有着重要的影响，因此针对视觉惯性里程计的效果展示首先从车身状态的判别结果开始。
+
+车身状态的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身两个状态$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身状态判别方法在所有指标上均表现出色，具有较高的准确性和鲁棒性。
+
+\begin{table}
+\centering
+\caption{车身状态预测效果}
+\begin{tabular}{ccccc}
+\toprule
+          & 查准率  & 召回率  & F1得分 & 准确率  \\
+\midrule
+$z^{FOR}$ & 0.86 & 0.85 & 0.85 & 0.95 \\
+$z^{LAT}$ & 0.98 & 0.97 & 0.98 & 0.96 \\
+\bottomrule
+\end{tabular}
+\label{tab:pose_detection}
+\end{table}
+
+\subsection{定量对比}
+在验证过车身状态判别的效果后，本文将车身状态判别加入到视觉惯性里程计中，在其余序列上与其他几种视觉惯性里程计方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的视觉惯性里程计方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
+
+在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环(Loop Closure)检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的视觉惯性里程计在配合回环检测之后依旧可以取得较好的效果。
+
+另外，有些方法在某些序列上运行失败，所以在表中使用N/A表示；有些方法可以运行成功，但是中途崩溃，产生的轨迹与真值误差过大，所以在表中我们仅汇报误差小于60米的结果，对于误差大于60米的结果我们使用\textgreater{}60表示。
+
+\begin{table}
+\centering
+\caption{视觉惯性里程计的$ATE_t$\textdownarrow{}对比}
+\begin{tabular}{c|c|ccccc}
+\toprule
+方法 & 类型           & OL1 & OL2 & OL3 & OL4 & OL5 \\ \midrule
+OKVIS2          & \multirow{6}{*}{VIO}    & \multicolumn{5}{c}{\textgreater{}60}                       \\
+BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                       \\
+OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+VINS-Mono       &                         & 15.696389                                & 12.439054                                &20.552186                                & 7.972945                                 & 13.211903                                \\
+ORB-SLAM3*       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FA7F6F}\textbf{6.931078}                                 \\
+本文VIO            &                         & \cellcolor[HTML]{FA7F6F}\textbf{8.847395}                                 & \cellcolor[HTML]{FA7F6F}\textbf{4.343367}                                 &  \cellcolor[HTML]{FA7F6F}\textbf{17.193425}                                & \cellcolor[HTML]{FA7F6F}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
+DSO*         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
+OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
+BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
+OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
+ORB-SLAM3*       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FA7F6F}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FA7F6F}\textbf{5.520636}                                 \\
+本文VIO            &                         & \cellcolor[HTML]{FA7F6F}\textbf{3.834251}                                 & \cellcolor[HTML]{FA7F6F}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FA7F6F}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
+\end{tabular}
+\label{tab:vio_ate}
+\begin{tablenotes}
+  \footnotesize
+  \item 星号*表示ORB-SLAM3和DSO因单目版本初始化困难而使用双目版本；LC表示回环检测(Loop Closure)；N/A表示方法在该序列上无法运行；\textgreater{}60表示方法在该序列上的误差大于60米
+\end{tablenotes}
+\end{table}
+
+从表~\ref{tab:vio_ate} 中可以看出，在单纯的VIO对比中，本文所提出的视觉惯性里程计方法在大多数序列上$ATE_t$表现出色，相较于其他方法具有更高的精度。在VIO+LC的对比中，本文的方法在大多数序列上仍然有最好的表现，但是在OL3和OL5序列上的表现相对较差，ORB-SLAM3在这两个序列上表现较好。此外，本文VIO基于VINS-Mono改进而来，所以在与VINS-Mono的对比中全面领先，说明本文视觉惯性里程计中的改进有一定效果。
+
 \begin{table}[]
-  \centering
-  \begin{tabular}{c|c|ccccc}
-  \toprule
-  \textbf{Method} & \textbf{Type}           & \textbf{OL1} & \textbf{OL2} & \textbf{OL3} & \textbf{OL4} & \textbf{OL5} \\ \midrule
-  OKVIS2          & \multirow{6}{*}{VIO}    & \multicolumn{5}{c}{\textgreater{}300}                       \\
-  BASALT          &                         & \multicolumn{5}{c}{\textgreater{}300}                       \\
-  OpenVINS        &                         & 37.917951                                & 52.712329                                & 109.021385                               & N/A                                      & N/A                                      \\
-  VINS-Mono       &                         & 15.696389                                & 12.439054                                & \cellcolor[HTML]{FA7F6F}\textbf{16.389739}                                & 7.972945                                 & 13.211903                                \\
-  ORB-SLAM3       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FA7F6F}\textbf{6.931078}                                 \\
-  Ours            &                         & \cellcolor[HTML]{FA7F6F}\textbf{8.847395}                                 & \cellcolor[HTML]{FA7F6F}\textbf{4.343367}                                 & 18.312372                                & \cellcolor[HTML]{FA7F6F}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
-  DSO+IMU         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
-  OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}300}                         \\
-  BASALT          &                         & \multicolumn{5}{c}{\textgreater{}300}                         \\
-  OpenVINS        &                         & 37.917951                                & 52.712329                                & 109.021385                               & N/A                                      & N/A                                      \\
-  VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
-  ORB-SLAM3       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FA7F6F}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FA7F6F}\textbf{5.520636}                                 \\
-  Ours            &                         & \cellcolor[HTML]{FA7F6F}\textbf{3.834251}                                 & \cellcolor[HTML]{FA7F6F}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FA7F6F}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
-  \end{tabular}
-  \end{table}
+\centering
+\caption{视觉惯性里程计的RPE\textdownarrow{}对比}
+\begin{tabular}{ccccccc}
+\toprule
+方法        & 指标                    & OF1               & OF2               & OF3               & OF4               & OF5               \\ \midrule
+OpenVINS  & \multirow{4}{*}{$RPE_t$} & 7.576759          & 8.893709          & 12.631715         & N/A               & N/A               \\
+VINS-Mono &                       & 3.921487          & 2.330876          & 5.648737          & 3.447067          & 2.598062          \\
+ORB-SLAM3* &                       & \cellcolor[HTML]{FA7F6F}\textbf{1.962480} & 2.361792          & \cellcolor[HTML]{FA7F6F}\textbf{4.987597} & \cellcolor[HTML]{FA7F6F}\textbf{2.963017} & \cellcolor[HTML]{FA7F6F}\textbf{1.176156} \\
+本文VIO      &                       & 3.459246          & \cellcolor[HTML]{FA7F6F}\textbf{1.986364} & 5.887755          & 3.731419          & 3.227312          \\ \midrule
+OpenVINS  & \multirow{4}{*}{$RPE_r$} & 2.122706          & 1.752747          & 3.904525          & N/A               & N/A               \\
+VINS-Mono &                       & 1.062495          & 0.783557          & 3.411987          & 1.747575          & 0.990526          \\
+ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.002619          & 1.764101          & 0.981966          \\
+本文VIO       &                       & \cellcolor[HTML]{FA7F6F}\textbf{0.818242} & \cellcolor[HTML]{FA7F6F}\textbf{0.776345} & \cellcolor[HTML]{FA7F6F}\textbf{2.543815} & \cellcolor[HTML]{FA7F6F}\textbf{1.732620} & \cellcolor[HTML]{FA7F6F}\textbf{0.882806} \\ \bottomrule
+\end{tabular}
+\label{tab:vio_rpe}
+\begin{tablenotes}
+  \footnotesize
+  \item 星号*表示ORB-SLAM3因单目版本初始化困难而使用双目版本；N/A表示方法在该序列上无法运行；由于OKVIS2和BASALT在$ATE_t$指标下误差过大，此处不再汇报RPE指标
+\end{tablenotes}
+\end{table}
 
-  \begin{table}
-  \centering
-  \begin{tabular}{ccccc}
-  \toprule
-  \textbf{方法}           & \textbf{OL2}      & \textbf{OL3}      & \textbf{OL4}      & \textbf{OL5}      \\ \midrule
-  VINS-Mono           & 7.878626          & 10.664015         & 7.661955          & 8.083566          \\
-  VINS-Fusion+RTK     & 1.801669          & 2.000104          & \cellcolor[HTML]{FA7F6F}\textbf{1.809687}          & 2.448607          \\
-  VINS-Mono+MonoMap   & 3.092430          & N/A               & N/A               & N/A               \\
-  VINS-Mono+FusionMap & 2.440850          & N/A               & N/A               & N/A               \\
-  ORB-SLAM3           & 15.621815         & 6.288431          & 5.073350          & 5.520636          \\
-  ORB-SLAM3+ORBMAP    & 19.249121         & N/A               & N/A               & N/A               \\
-  VLS                 & 1.715343          & 2.913034          & 4.515426          & 1.862401          \\
-  Ours                & \cellcolor[HTML]{FA7F6F}\textbf{0.777091} & \cellcolor[HTML]{FA7F6F}\textbf{0.938238} & 3.792201 & \cellcolor[HTML]{FA7F6F}\textbf{0.767040} \\ \bottomrule
-  \end{tabular}
-  \end{table}
+从表~\ref{tab:vio_rpe} 中的结果可以看出，本文VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至VINS-Mono；但是在相对旋转误差$RPE_r$上，本文VIO在所有序列上均表现出色，具有更高的精度。产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
 
-  \begin{table}
-  \centering
-  \begin{tabular}{ccccccc}
-  \toprule
-  \textbf{方法}       & \textbf{NH2}      & \textbf{NH3}      & \textbf{NH4}      & \textbf{NH5}      & \textbf{NH6}      & \textbf{NH7}      \\ \midrule
-  VINS-Fusion+RTK & 0.584860          & 0.557219          & 0.584881          & 0.708736          & 0.764223          & 1.098182          \\
-  ORB-SLAM3       & 3.896760          & 1.074461          & 3.326053          & 2.883349          & 4.258630          & 1.770878          \\
-  VINS-Mono       & 1.424692          & 3.227336          & 1.526516          & 2.821233          & 3.874702          & 1.720061          \\
-  VLS             & 0.385877          & 0.338285          & 0.336795          & 0.409525          & \cellcolor[HTML]{FA7F6F}\textbf{0.463320} & 0.304587          \\
-  Ours            & \cellcolor[HTML]{FA7F6F}\textbf{0.325610} & \cellcolor[HTML]{FA7F6F}\textbf{0.323113} & \cellcolor[HTML]{FA7F6F}\textbf{0.303237} & \cellcolor[HTML]{FA7F6F}\textbf{0.377129} & 0.494464          & \cellcolor[HTML]{FA7F6F}\textbf{0.291957} \\ \bottomrule
-  \end{tabular}
-  \end{table}
+\subsection{消融实验}
+为了探究本文提出的视觉惯性里程计方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括VIO、惯性-车体因子、伪观测约束、车身状态判别和车身状态真值，其中VIO是基础配置，在本文中即为VINS-Mono，其他变量的加入均是在VIO的基础上进行的；惯性-车体因子表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；伪观测约束表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；车身状态判别表示是否根据车身状态判别神经网络的结果而调整后端优化量；车身状态真值表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块，空白表示未使用。
+
+\begin{table}
+\centering
+\caption{视觉惯性里程计消融实验}
+\begin{tabular}{ccccc|ccc}
+\toprule
+VIO        & \begin{tabular}[c]{@{}c@{}}惯性-车体\\ 因子\end{tabular} & \begin{tabular}[c]{@{}c@{}}伪观测\\ 约束\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 判别\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 真值\end{tabular} & $ATE_t$\textdownarrow{}       & $RPE_t$\textdownarrow{}     & $RPE_r$\textdownarrow{}      \\ \midrule
+$\checkmark$           &                          &                        &                         &                         & 20.552186            & 5.648737             & 3.411987             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             &                         &                         & 23.269810            & 5.594315             & 2.588779             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             & $\checkmark$              &                         & 17.193425            & 5.887755             & 2.543815             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             &                         & $\checkmark$              & 14.685789            & 5.277349             & 2.522826             \\
+$\checkmark$           &                          & $\checkmark$             &                         & $\checkmark$              & 17.361096            & 5.099256             & 2.577359             \\ \bottomrule
+\end{tabular}
+\label{tab:vio_ablation}
+\end{table}
+
+表中第二行的含义是不论车身处于何种状态，均使用直行时的车身速度假设，因此从前两行的对比中可以发现，当使用了惯性车体因子和伪观测约束后，$ATE_t$产生了明显的下降，但是$RPE_t$有了轻微的改善，$RPE_r$有了明显的改善。这说明了惯性车体因子和伪观测约束的加入对于车身旋转的估计有着重要的影响，但是这会对平移的估计产生一定负面影响。即说明如果全程使用直行时的车身速度假设，会对里程计的平移估计精度产生负面影响，但对旋转估计精度有着积极的影响。
+
+表中第三行在第二行的基础上加入了对车身状态的预测，虽然预测与真实情况可能存在偏差，但是可以从数据上得出：当加入了车身状态判别后，$ATE_t$产生明显的下降，$RPE_t$有所增加，$RPE_r$有轻微改善，这说明了车身状态判别对于绝对定位精度的提升有着重要的影响。虽然其本身存在的状态预测误差则会对相对位移的估计产生一定的负面影响，但是综合来看其对于绝对位置和旋转角度估计的精度提升可以使其忽略对相对位移估计产生的负面影响。
+
+表中第四行在第三行的基础上将车身状态的预测值替换为真值，这一行为对$ATE_t$、$RPE_t$和$RPE_r$三个指标都产生了增益效果，这侧面证明了：当使用预测值时产生的相对位移估计精度损失是由于预测值的误差导致的，而当使用真值时，这一误差被消除，所以在$ATE_t$、$RPE_t$和$RPE_r$三个指标上都取得了较大的进步。
+
+表中最后一行在第四行的基础上去掉了惯性车体因子，即在优化过程中不优化惯性-车体因子，而仅使用初始量。这一行相较于第四行的结果是：$ATE_t$和$RPE_r$产生了一定程度的损失，但是$RPE_t$却达到了最好效果。这一行的结果表明：惯性-车体因子的实时优化对于绝对位置精度和旋转估计有着重要的积极影响，但是对于相对平移估计则有着负面影响。但是综合来看，优化惯性-车体因子对于绝对位置和相对旋转的估计的提升明显，而对于相对位置估计精度的影响有限，因此有保留的必要。
+
+
+
+
+\begin{table}
+\centering
+\begin{tabular}{ccccc}
+\toprule
+\textbf{方法}           & \textbf{OL2}      & \textbf{OL3}      & \textbf{OL4}      & \textbf{OL5}      \\ \midrule
+VINS-Mono           & 7.878626          & 10.664015         & 7.661955          & 8.083566          \\
+VINS-Fusion+RTK     & 1.801669          & 2.000104          & \cellcolor[HTML]{FA7F6F}\textbf{1.809687}          & 2.448607          \\
+VINS-Mono+MonoMap   & 3.092430          & N/A               & N/A               & N/A               \\
+VINS-Mono+FusionMap & 2.440850          & N/A               & N/A               & N/A               \\
+ORB-SLAM3           & 15.621815         & 6.288431          & 5.073350          & 5.520636          \\
+ORB-SLAM3+ORBMAP    & 19.249121         & N/A               & N/A               & N/A               \\
+VLS                 & 1.715343          & 2.913034          & 4.515426          & 1.862401          \\
+Ours                & \cellcolor[HTML]{FA7F6F}\textbf{0.777091} & \cellcolor[HTML]{FA7F6F}\textbf{0.938238} & 3.792201 & \cellcolor[HTML]{FA7F6F}\textbf{0.767040} \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}
+\centering
+\begin{tabular}{ccccccc}
+\toprule
+\textbf{方法}       & \textbf{NH2}      & \textbf{NH3}      & \textbf{NH4}      & \textbf{NH5}      & \textbf{NH6}      & \textbf{NH7}      \\ \midrule
+VINS-Fusion+RTK & 0.584860          & 0.557219          & 0.584881          & 0.708736          & 0.764223          & 1.098182          \\
+ORB-SLAM3       & 3.896760          & 1.074461          & 3.326053          & 2.883349          & 4.258630          & 1.770878          \\
+VINS-Mono       & 1.424692          & 3.227336          & 1.526516          & 2.821233          & 3.874702          & 1.720061          \\
+VLS             & 0.385877          & 0.338285          & 0.336795          & 0.409525          & \cellcolor[HTML]{FA7F6F}\textbf{0.463320} & 0.304587          \\
+Ours            & \cellcolor[HTML]{FA7F6F}\textbf{0.325610} & \cellcolor[HTML]{FA7F6F}\textbf{0.323113} & \cellcolor[HTML]{FA7F6F}\textbf{0.303237} & \cellcolor[HTML]{FA7F6F}\textbf{0.377129} & 0.494464          & \cellcolor[HTML]{FA7F6F}\textbf{0.291957} \\ \bottomrule
+\end{tabular}
+\end{table}
