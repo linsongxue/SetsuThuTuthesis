@@ -63,7 +63,7 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
 
 与KITTI数据集相比，4Seasons数据集能够提供更具挑战性和说服力的实验结果，突出了本文方法的优势。本文选择了四个具有代表性的场景，分别是
 
-\textbf{(1)Office Loop (OF):} 位于城郊工业区的环形路线，包含了多种感知条件，如建筑物、树木和道路标志等，如图~\ref{fig:OF_data} 所示。此路线在不同季节采集了5条序列(以OF1-5代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{(1)Office Loop (OF):} 位于城郊工业区的环形路线，长度约为3776米，包含了多种感知条件，如建筑物、树木和道路标志等，如图~\ref{fig:OF_data} 所示。此路线在不同季节采集了5条序列(以OF1-5代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 \begin{figure}
   \centering
   \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{OfficialLoop.png}}
@@ -72,7 +72,7 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
   \label{fig:OF_data}
 \end{figure}
 
-\textbf{(2) Neighborhood (NH):} 位于城镇环境的环形路线，包含了多种感知条件，如树木和房屋等，包含了更多的植被，接近于农村环境，如图~\ref{fig:NH_data} 所示。此路线在不同季节采集了7条序列(以NH1-7代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{(2) Neighborhood (NH):} 位于城镇环境的环形路线，长度约为2106米,包含了多种感知条件，如树木和房屋等，包含了更多的植被，接近于农村环境，如图~\ref{fig:NH_data} 所示。此路线在不同季节采集了7条序列(以NH1-7代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
@@ -82,7 +82,7 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
   \label{fig:NH_data}
 \end{figure}
 
-\textbf{(3) Business Campus (BC):} 位于校园和商业区的多条环形路线，包含了更多的建筑物，如图~\ref{fig:BC_data} 所示。此路线在不同季节采集了3条序列(以BC1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{(3) Business Campus (BC):} 位于校园和商业区的多条环形路线，长度约为3011米，包含了更多的建筑物，如图~\ref{fig:BC_data} 所示。此路线在不同季节采集了3条序列(以BC1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
@@ -92,7 +92,7 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
   \label{fig:BC_data}
 \end{figure}
 
-\textbf{(4) Old Town (OT):} 位于城市中心的商业区，包含了多种感知条件，此外还有大量的移动物体，如汽车、行人和自行车等，如图~\ref{fig:OT_data} 所示。此路线在不同季节采集了3条序列(以OT1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{(4) Old Town (OT):} 位于城市中心的商业区环线，长度约为5034米，包含了多种感知条件，此外还有大量的移动物体，如汽车、行人和自行车等，如图~\ref{fig:OT_data} 所示。此路线在不同季节采集了3条序列(以OT1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
@@ -147,7 +147,7 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 
 接下来的实验结果汇报均使用以上三种指标，并且除了轨迹的对齐部分意外，均使用\citet{grupp2017evo}提出的开源工具包EVO进行计算。
 
-\section{先验地图构建效果}
+\section{离线建图模块测试}
 对于离线建图性能，本文以地图关键帧的位姿评估来定量对比建图精度。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。
 
 \begin{table}[]
@@ -215,9 +215,9 @@ VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地
 
 在相对旋转误差$RPE_r$方面，本文方法在大多数序列中也表现出优越性能。相对旋转误差反映了位姿估计的准确性，本文方法和COLMAP都基于离线的三维重建方法，能够支持全局优化的计算成本，所以两种方的位姿估计精度相较于VINS-Stereo有明显提升。由于GNSS测量不提供旋转约束，本文的方法与COLMAP在旋转精度上的差异较小。
 
-\section{视觉惯性里程计效果}
+\section{视觉惯性里程计模块测试}
 
-\subsection{车身状态判别效果}
+\subsection{车身状态判别测试}
 视觉惯性里程计的运行过程中使用到了车身状态结果，并且车身状态判别的结果对里程计精度有着重要的影响，因此针对视觉惯性里程计的效果展示首先从车身状态的判别结果开始。
 
 车身状态的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身两个状态$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身状态判别方法在所有指标上均表现出色，具有较高的准确性和鲁棒性。
@@ -236,7 +236,7 @@ $z^{LAT}$ & 0.98 & 0.97 & 0.98 & 0.96 \\
 \label{tab:pose_detection}
 \end{table}
 
-\subsection{定量对比}
+\subsection{里程计精度测试}
 在验证过车身状态判别的效果后，本文将车身状态判别加入到视觉惯性里程计中，在其余序列上与其他几种视觉惯性里程计方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的视觉惯性里程计方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
 
 在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环(Loop Closure)检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的视觉惯性里程计在配合回环检测之后依旧可以取得较好的效果。
@@ -296,8 +296,25 @@ ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.0
 
 从表~\ref{tab:vio_rpe} 中的结果可以看出，本文VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至VINS-Mono；但是在相对旋转误差$RPE_r$上，本文VIO在所有序列上均表现出色，具有更高的精度。产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
 
-\subsection{消融实验}
-为了探究本文提出的视觉惯性里程计方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括VIO、惯性-车体因子、伪观测约束、车身状态判别和车身状态真值，其中VIO是基础配置，在本文中即为VINS-Mono，其他变量的加入均是在VIO的基础上进行的；惯性-车体因子表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；伪观测约束表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；车身状态判别表示是否根据车身状态判别神经网络的结果而调整后端优化量；车身状态真值表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块，空白表示未使用。
+为了验证这一猜想，本文对车身坐标系的速度量进行分析。分析建立在OF2和OF3两条序列上，这两条序列有着比较突出的特点：OF2序列上本文视觉惯性里程计的$RPE_t$和$RPE_r$均有所提升，但是整体幅度较小；OF3序列上本文视觉惯性里程计的$RPE_t$有所下降，但是$RPE_r$有所提升，而且每100米的旋转误差减小了接近1度。因此选择这两条序列进行分析，能够更好发现本文的速度伪观测约束在何种条件下会对里程计的效果产生积极影响。两条序列上的速度量在车身坐标系的变化如图~\ref{fig:VIO_velocity}所示。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{OF2序列}{\includegraphics[width=1.0\linewidth]{VIO_velocity_OF2.pdf}}
+  \subcaptionbox*{OF3序列}{\includegraphics[width=1.0\linewidth]{VIO_velocity_OF3.pdf}}
+  \caption{车身速度展示}
+  \label{fig:VIO_velocity}
+\end{figure}
+
+在每个序列上分别展示了“VIO”、“VIO+伪观测”、“VIO+伪观测-因子”三种情况下的速度变化，其中“VIO”表示使用通用VIO方法获得的速度估计结果；“VIO+伪观测”表示在通用VIO中加入本文所提出的车身状态判断以及伪观测约束后的速度估计结果；“VIO+伪观测-因子”表示在VIO和伪观测约束的基础上，不使用惯性-车体因子进行后端优化。此外，为了将速度变化与车身状态区间直观展示，本文中还将对应车身停止、转弯和直行的区间标注在了速度图中。
+
+从两个序列中的速度变化可以看到：相较于OF2序列，OF3序列的“VIO”在车身横向(X轴方向)和垂直(Z轴方向)速度上有着更大的取值，这说明在OF3序列上基础VIO的速度估计有更大的误差，而在该场景下，经过本文所提出的伪观测约束进行优化后，“VIO+伪观测”横向和垂直速度有了更合理的估计，从而使得OF3上的$RPE_r$有了明显的提升。相较而言，OF2序列上的速度变化较为平缓，所以在该场景下，伪观测约束的加入对于速度估计的影响较小，使得“VIO+伪观测”在OF2序列上的$RPE_r$仅有微弱提升。
+
+此外，观察两个序列下的速度变化，可以发现在OF2上，“VIO+伪观测”的车身横向和垂直速度全过程都有较为平滑的估计结果，相比之下OF3序列上“VIO+伪观测”在最后阶段出现了较明显的起伏，因此其出现了OF3序列上本文方法的$RPE_t$有所下降的现象，而OF2序列上本文方法的$RPE_t$达到同类方法的最优。
+
+
+\subsection{里程计消融实验}
+为了探究本文提出的视觉惯性里程计方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括“VIO”、“惯性-车体因子”、“伪观测约束”、“车身状态判别”和“车身状态真值”，其中“VIO”是基础配置，在本文中即为VINS-Mono，其他变量的加入均是在VIO的基础上进行的；“惯性-车体因子”表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；“伪观测约束”表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；“车身状态判别”表示是否根据车身状态判别神经网络的结果而调整后端优化量；“车身状态真值”表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块。
 
 \begin{table}
 \centering
@@ -314,7 +331,7 @@ $\checkmark$           &                          & $\checkmark$             &  
 \label{tab:vio_ablation}
 \end{table}
 
-表中第二行的含义是不论车身处于何种状态，均使用直行时的车身速度假设，因此从前两行的对比中可以发现，当使用了惯性车体因子和伪观测约束后，$ATE_t$产生了明显的下降，但是$RPE_t$有了轻微的改善，$RPE_r$有了明显的改善。这说明了惯性车体因子和伪观测约束的加入对于车身旋转的估计有着重要的影响，但是这会对平移的估计产生一定负面影响。即说明如果全程使用直行时的车身速度假设，会对里程计的平移估计精度产生负面影响，但对旋转估计精度有着积极的影响。
+表中第二行的含义是不论车身处于何种状态，均使用直行时的车身速度假设，因此从前两行的对比中可以发现，当使用了惯性车体因子和伪观测约束后，$ATE_t$产生了明显的下降，但是$RPE_t$有了轻微的改善，$RPE_r$有了明显的改善。这说明了惯性车体因子和伪观测约束的加入对于车身旋转的估计有着重要的影响，但是这会对平移的估计产生一定负面影响。即说明如果全程使用直行时的车身速度假设，会对里程计的平移估计精度产生负面影响，但对旋转的估计精度有积极影响。
 
 表中第三行在第二行的基础上加入了对车身状态的预测，虽然预测与真实情况可能存在偏差，但是可以从数据上得出：当加入了车身状态判别后，$ATE_t$产生明显的下降，$RPE_t$有所增加，$RPE_r$有轻微改善，这说明了车身状态判别对于绝对定位精度的提升有着重要的影响。虽然其本身存在的状态预测误差则会对相对位移的估计产生一定的负面影响，但是综合来看其对于绝对位置和旋转角度估计的精度提升可以使其忽略对相对位移估计产生的负面影响。
 
@@ -322,7 +339,53 @@ $\checkmark$           &                          & $\checkmark$             &  
 
 表中最后一行在第四行的基础上去掉了惯性车体因子，即在优化过程中不优化惯性-车体因子，而仅使用初始量。这一行相较于第四行的结果是：$ATE_t$和$RPE_r$产生了一定程度的损失，但是$RPE_t$却达到了最好效果。这一行的结果表明：惯性-车体因子的实时优化对于绝对位置精度和旋转估计有着重要的积极影响，但是对于相对平移估计则有着负面影响。但是综合来看，优化惯性-车体因子对于绝对位置和相对旋转的估计的提升明显，而对于相对位置估计精度的影响有限，因此有保留的必要。
 
+\section{紧耦合地图定位模块测试}
+\subsection{KITTI数据集测试}
+紧耦合地图定位模块的测试在两个数据集上进行，分别是KITTI数据集和4Seasons数据集。在KITTI数据集上，本文的紧耦合地图定位模块和VINS-Fusion、VINS-Fusion-Map、ORB-SLAM3和ORB—SLAM3-Map进行对比，其中VINS-Fusion-Map和ORB—SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。测试结果如表~\ref{tab:loc_kitti} 和图~\ref{fig:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
 
+\begin{table}
+\centering
+\caption{KITTI数据集多指标对比}
+\begin{tabular}{c|c|cccccccccc}
+\toprule
+方法    & 指标                    & 00            & 01            & 02            & 04            & 05            & 06            & 07            & 08            & 09            & 10            \\ \midrule
+ORB   & \multirow{5}{*}{$ATE_t$\textdownarrow{}}  & 3.51          & 4.92          & 5.70          & \cellcolor[HTML]{FA7F6F}\textbf{0.27} & 1.84          & 1.68          & 0.96          & 3.32          & 3.37          & 0.90          \\
+ORBM  &                       & 7.19          & 10.11         & 10.32         & 0.98          & 1.54          & 2.35          & 1.67          & 5.36          & 7.61          & 0.95          \\
+VINS  &                       & 5.95          & 6.49          & 5.99          & 1.08          & 5.98          & 3.48          & 2.41          & 3.85          & \cellcolor[HTML]{FA7F6F}\textbf{1.78}          & 3.78          \\
+VINSM &                       & 3.92          & 8.01          & 13.08         & 1.23          & 3.88          & 1.79          & 0.65          & 9.89          & 6.17          & 3.63          \\
+本文方法    &                       & \cellcolor[HTML]{FA7F6F}\textbf{0.97} & \cellcolor[HTML]{FA7F6F}\textbf{4.09} & \cellcolor[HTML]{FA7F6F}\textbf{0.70} & 0.53          & \cellcolor[HTML]{FA7F6F}\textbf{1.24} & \cellcolor[HTML]{FA7F6F}\textbf{1.56} & \cellcolor[HTML]{FA7F6F}\textbf{0.21} & \cellcolor[HTML]{FA7F6F}\textbf{1.68} & 1.87 & \cellcolor[HTML]{FA7F6F}\textbf{0.82} \\ \midrule
+ORB   & \multirow{5}{*}{$RPE_t$\textdownarrow{}} & 0.88          & 1.44          & 0.77          & \cellcolor[HTML]{FA7F6F}\textbf{0.46} & 0.62          & 0.89          & 0.89          & 1.03          & \cellcolor[HTML]{FA7F6F}\textbf{0.86} & 0.62          \\
+ORBM  &                       & 0.69          & 1.46          & 0.77          & 0.49          & \cellcolor[HTML]{FA7F6F}\textbf{0.40} & \cellcolor[HTML]{FA7F6F}\textbf{0.46} & 0.52          & 1.04          & 0.87          & \cellcolor[HTML]{FA7F6F}\textbf{0.61} \\
+VINS  &                       & 3.45          & 12.18         & 2.65          & 2.71          & 1.41          & 1.33          & 1.17          & 3.46          & 4.45          & 2.38          \\
+VINSM &                       & 1.23          & 2.44          & 1.49          & 1.37          & 1.46          & 0.88          & 0.71          & 1.66          & 1.97          & 2.45          \\
+本文方法    &                       & \cellcolor[HTML]{FA7F6F}\textbf{0.74} & \cellcolor[HTML]{FA7F6F}\textbf{1.44} & \cellcolor[HTML]{FA7F6F}\textbf{0.68} & 1.87          & 0.75          & 0.84          & \cellcolor[HTML]{FA7F6F}\textbf{0.39} & \cellcolor[HTML]{FA7F6F}\textbf{0.96} & 1.03          & 0.82          \\ \midrule
+ORB   & \multirow{5}{*}{$RPE_r$\textdownarrow{}} & 0.31          & \cellcolor[HTML]{FA7F6F}\textbf{0.19} & \cellcolor[HTML]{FA7F6F}\textbf{0.28} & 0.19          & 0.26          & 0.27          & 0.50          & 0.31          & 0.25          & 0.29          \\
+ORBM  &                       & 0.26          & \cellcolor[HTML]{FA7F6F}\textbf{0.19} & \cellcolor[HTML]{FA7F6F}\textbf{0.28} & \cellcolor[HTML]{FA7F6F}\textbf{0.08} & \cellcolor[HTML]{FA7F6F}\textbf{0.16} & \cellcolor[HTML]{FA7F6F}\textbf{0.15} & 0.30          & 0.31          & 0.25          & \cellcolor[HTML]{FA7F6F}\textbf{0.28} \\
+VINS  &                       & 1.45          & 3.54          & 1.26          & 0.62          & 0.69          & 0.72          & 0.87          & 1.77          & 1.87          & 0.94          \\
+VINSM &                       & 0.73          & 0.48          & 0.56          & 0.69          & 0.67          & 0.58          & 0.57          & 0.65          & 0.59          & 0.99          \\
+本文方法    &                       & \cellcolor[HTML]{FA7F6F}\textbf{0.27} & 0.34          & 0.30          & 0.30          & 0.19          & 0.17          & \cellcolor[HTML]{FA7F6F}\textbf{0.26} & \cellcolor[HTML]{FA7F6F}\textbf{0.29} & \cellcolor[HTML]{FA7F6F}\textbf{0.19} & 0.30          \\ \bottomrule
+\end{tabular}
+\label{tab:loc_kitti}
+\begin{tablenotes}
+  \footnotesize
+  \item ORB和ORBM分别表示ORB-SLAM3和ORB-SLAM3-Map；VINS和VINSM分别表示VINS-Fusion和VINS-Fusion-Map
+\end{tablenotes}
+\end{table}
+
+从表中对KITTI数据集上多项指标的对比结果来看，不同方法在不同序列上表现存在较大差异。对于绝对轨迹误差$ATE_t$指标，本文方法在序列 00、01、02、05、06、07、08 和 10 上均取得了最低值，说明在绝对位姿精度上具有较明显的优势；仅在序列 04 上，ORB-SLAM3表现更优，而序列 09 的结果略有争议，尽管 VINS 在此处显示出稍低的误差，但总体来看，本文方法在大部分序列中均展现出更好的平稳性。
+
+对于相对平移误差$RPE_t$而言，各方法的表现相对分散。本文方法在序列 01、02、07 和 08 上表现突出，但在其他序列中，ORB-SLAM3、ORB-SLAM3-Map或其他方法有时能获得更低的误差，表明在平移精度方面，各算法对场景和运动状态的敏感性不同。
+
+而在相对旋转误差$RPE_r$方面，本文方法在部分序列，如 00、07、08、09，中取得了较低的值，体现出在角度估计上的一定优势，但在序列 01、02 和 04 上，ORB-SLAM3 或 ORB-SLAM3-Map 的表现更佳，说明在旋转精度上，算法之间仍存在细微差距。
+
+综合来看，本文方法在大部分场景下均能保持较高的翻译精度，并在旋转估计上具有竞争力，这表明所提出的算法具有较好的鲁棒性和适应性。
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\linewidth]{loc_kitti.pdf}
+  \caption{KITTI数据集测试轨迹示意图}
+  \label{fig:loc_kitti}
+\end{figure}
 
 
 \begin{table}
