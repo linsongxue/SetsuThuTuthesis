@@ -340,6 +340,8 @@ $\checkmark$           &                          & $\checkmark$             &  
 表中最后一行在第四行的基础上去掉了惯性车体因子，即在优化过程中不优化惯性-车体因子，而仅使用初始量。这一行相较于第四行的结果是：$ATE_t$和$RPE_r$产生了一定程度的损失，但是$RPE_t$却达到了最好效果。这一行的结果表明：惯性-车体因子的实时优化对于绝对位置精度和旋转估计有着重要的积极影响，但是对于相对平移估计则有着负面影响。但是综合来看，优化惯性-车体因子对于绝对位置和相对旋转的估计的提升明显，而对于相对位置估计精度的影响有限，因此有保留的必要。
 
 \section{紧耦合地图定位模块测试}
+紧耦合地图定位模块的测试在KITTI数据集和4Seasons数据集上进行，本节将分别对两个数据集上的测试结果进行展示。其中KITTI数据集上的测试使用模拟的多趟行驶数据，即彩色相机图像建图，灰度图像定位的模式，建图场景和测试场景的变化较小；而4Seasons数据集上的测试使用真实的多趟行驶数据，定位和建图的场景变化较大，具有较强的挑战性。
+
 \subsection{KITTI数据集测试}
 紧耦合地图定位模块的测试在两个数据集上进行，分别是KITTI数据集和4Seasons数据集。在KITTI数据集上，本文的紧耦合地图定位模块和VINS-Fusion、VINS-Fusion-Map、ORB-SLAM3和ORB—SLAM3-Map进行对比，其中VINS-Fusion-Map和ORB—SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。测试结果如表~\ref{tab:loc_kitti} 和图~\ref{fig:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
 
@@ -386,6 +388,74 @@ VINSM &                       & 0.73          & 0.48          & 0.56          & 
   \caption{KITTI数据集测试轨迹示意图}
   \label{fig:loc_kitti}
 \end{figure}
+
+\subsection{4Seasons数据集测试}
+\subsubsection{Offical Loop测试}
+4Seasons数据集实在同一条线路上多次采集获得的，采集的时间跨度从几十分钟到一年，所以其场景相对于KITTI数据集有更多的变化，包括季节、天气、晨昏等。本文首先在Offical Loop的一般性场景下进行测试。一般性场景测时的建图序列为2020.03.24 17:36拍摄，而定位序列为2020.03.24 17:45拍摄，两个场景差异较小，因此可以同时比较多个方法的表现。
+
+测试结果如表~\ref{tab:loc_4seasons_1} 所示，其中包括了VINS-Mono、VINS-Fusion、ORB-SLAM3、VLS\cite{yang2022real}(2022)、GPLD\cite{hao2023global}(2023)、MVIL\cite{zhang2023map}(2023)等方法与本文方法的对比。首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比，这些方法分别表示使用VINS-Mono、本文离线建图和ORB-SLAM3建图的结果做为先验地图。从表中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_gnssmap} 所示。
+
+\begin{table}
+\centering
+\caption{4Seasons数据集指标对比}
+\begin{tabular}{c|cccc|ccc}
+\toprule
+方法                                     & 时间                                                                         & 季节                   & 天气                   & 晨昏                   & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+离线建图                                   & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36 \\ (OF1)\end{tabular}                   & 春季                   & 晴朗                   & 下午                   & 0.814881          & 0.929358          & 1.014480          \\ \midrule
+VINS-Mono                              & \multirow{10}{*}{\begin{tabular}[c]{@{}c@{}}03.24\\ 17:45 \\ (OF2)\end{tabular}} & \multirow{10}{*}{春季} & \multirow{10}{*}{晴朗} & \multirow{10}{*}{下午} & 7.878626          & 2.330876          & 0.783557          \\
+VINS-Mono w/ Map1                      &                                                                            &                      &                      &                      & 3.092430          & N/A               & N/A               \\
+VINS-Monow/ Map2                       &                                                                            &                      &                      &                      & 2.440850          & N/A               & N/A               \\
+ORB-SLAM3                              &                                                                            &                      &                      &                      & 15.621815         & 3.222846          & 0.890233          \\
+ORB-SLAM3 w/ Map3                      &                                                                            &                      &                      &                      & 19.249121         & N/A               & N/A               \\
+VINS-Fusion w/  RTK &                                                                            &                      &                      &                      & 1.801669          & 1.500405          & 1.085638          \\
+VLS                                    &                                                                            &                      &                      &                      & 1.715343          & 1.630718          & \cellcolor[HTML]{FA7F6F}\textbf{0.668220} \\
+GPLD                                   &                                                                            &                      &                      &                      & 8.720000          & N/A               & N/A               \\
+MVIL                                   &                                                                            &                      &                      &                      & 6.450000          & N/A               & N/A               \\
+本文方法                                   &                                                                            &                      &                      &                      & \cellcolor[HTML]{FA7F6F}\textbf{0.777091} & \cellcolor[HTML]{FA7F6F}\textbf{1.124076} & 0.759267          \\ \bottomrule
+\end{tabular}
+\label{tab:loc_4seasons_1}
+\begin{tablenotes}
+  \footnotesize
+  \item Map1表示使用VINS-Mono建图结果；Map2表示使用本文离线建图结果；Map3表示使用ORB-SLAM3建图结果；RTK表示使用了RTK-GPS数据，其定位精度达到厘米级
+\end{tablenotes}
+\end{table}
+
+在图~\ref{fig:loc_4seasons_of2} 中可以看到在放大区域有着明显的定位误差，但这并非由于本文的定位方法引入，而是由建图误差引入：如图~\ref{fig:loc_4seasons_of1} 所示，可以看到在定位误差较大的区域，建图时本身就存在明显的偏差，这导致了定位过程中引入了这一误差。因此，本文的定位方法在4Seasons数据集上的表现是受到了建图质量的影响，但是相较于其他方法，本文的定位方法在相同的建图条件下取得了更好的定位精度。
+
+\begin{figure}
+  \centering
+  \subcaptionbox{OF1序列建图轨迹\label{fig:loc_4seasons_of1}}{\includegraphics[width=0.47\linewidth]{OF1_zoomin.pdf}}
+  \subcaptionbox{OF2序列定位轨迹\label{fig:loc_4seasons_of2}}{\includegraphics[width=0.47\linewidth]{OF2_zoomin.pdf}}
+  \caption{4Seasons数据集定位结果及误差分析}
+  \label{fig:loc_gnssmap}
+\end{figure}
+
+在Offical Loop的环境下还有更多的具有挑战性的序列，本文在这些序列上也进行了测试。
+
+
+\begin{table}
+\centering
+\begin{tabular}{c|cccc|ccc}
+\toprule
+方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$               & $RPE_t$              & $RPE_r$              \\ \midrule
+离线建图               & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36\\ (OF1)\end{tabular}                  & 春季                  & 晴朗                  & 下午                  & 0.814881          & 0.929358          & 1.014480          \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}04.07\\ 10:20\\ (OF3)\end{tabular}} & \multirow{5}{*}{春季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 10.664015         & 5.305404          & 5.305404          \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 6.288431          & 5.000592          & 5.000592          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.000104          & 3.678773          & 3.678773          \\
+VLS                &                                                                                &                     &                     &                     & 2.913034          & 3.978592          & 3.519618 \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FA7F6F}\textbf{0.938238} & \cellcolor[HTML]{FA7F6F}\textbf{2.947031} & \cellcolor[HTML]{FA7F6F}\textbf{2.529328} \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}06.12\\ 10:10\\ (OF4)\end{tabular}} & \multirow{5}{*}{夏季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 7.661955          & 3.447067          & 1.747575          \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 5.073350          & 3.207118          & 1.760357          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.809687          & 2.158715          & 1.577418          \\
+VLS                &                                                                                &                     &                     &                     & 4.515426          & 8.142403          & 2.389229          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FA7F6F}\textbf{0.792201} & \cellcolor[HTML]{FA7F6F}\textbf{1.402346} & \cellcolor[HTML]{FA7F6F}\textbf{1.047381} \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 12:04\\ (OF5)\end{tabular}} & \multirow{5}{*}{冬季} & \multirow{5}{*}{降雪} & \multirow{5}{*}{下午} & 8.083566          & 2.598062          & \cellcolor[HTML]{FA7F6F}\textbf{0.990526} \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 5.520636          & 1.878826          & 1.000615          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.448607          & 1.333865          & 0.934714          \\
+VLS                &                                                                                &                     &                     &                     & 1.862401          & 1.835533          & 0.999361          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FA7F6F}\textbf{0.767040} & \cellcolor[HTML]{FA7F6F}\textbf{1.251208} & 0.999785          \\ \bottomrule
+\end{tabular}
+\end{table}
 
 
 \begin{table}
