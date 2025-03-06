@@ -292,7 +292,7 @@ SfM通常以特征检测和匹配为第一步：对于每个地图关键帧$K_i$
 
 在完成特征检测和匹配之后，SfM进一步估计地图关键帧的位姿以及结构的空间坐标。通过选择第一个地图关键帧作为视觉建图世界坐标系的原点，所有关键帧的位姿$\symcal{T}$都可以递归得通过相对位姿转换进行粗略估计。随后，SfM用三角化方法在视觉建图世界坐标系中估计稀疏点云结构$\symcal{P}$的粗略空间坐标。位姿估计与三角化过程密切相关：位姿的不确定性会导致三角化点的可靠性下降，反之亦然。因此，为了获得精确的 $\symcal{T}$ 和 $\symcal{P}$，更精确的优化过程必不可少。
 
-光束法平差(Bundle Adjustment, BA)是一种高效的位姿和点云结构优化方法，可通过最小化重投影误差来同时两种参数：
+BA是一种高效的位姿和点云结构优化方法，可通过最小化重投影误差来同时两种参数：
 \begin{equation}
 \label{eq:reproj_error}
 E_i = \sum_{j}\rho(\Vert \hat{\symbf{x}}_j - \pi(\symbf{T}^{k_i}_w, \symbf{p}_{m}^{w}) \Vert ^2_2),
@@ -302,7 +302,7 @@ E_i = \sum_{j}\rho(\Vert \hat{\symbf{x}}_j - \pi(\symbf{T}^{k_i}_w, \symbf{p}_{m
 \label{eq:proj_func}
 \pi(\symbf{T}^{k_i}_w, \symbf{p}_{m}^{w}) = [\symbf{K}\cdot(\symbf{R}_w^{k_i}\cdot\symbf{p}_{m}^{w}+\symbf{t}_w^{k_i})/d_j]_{0:2},
 \end{equation}
-其中，$d_j$ 是 $\symbf{p}_{m}^{w}$ 在相机坐标系中的深度，$[\cdot]_{0:2}$ 表示选择向量的前两个元素。需要注意的是，$E_i$ 表示单张图像的重投影误差，因此整个BA是对输入图像序列中的所有重投影误差进行累积优化的结果。BA的进行需要使用非线性优化方法，例如高斯-牛顿法或者Levenberg-Marquardt法，这需要误差函数\eqref{eq:reproj_error}关于参数$\symbf{T}^{k_i}_w$和$\symbf{p}_{m}^{w}$的雅可比矩阵，优化过程及雅可比矩阵的推导参考附录~\ref{appendix:quat}。
+其中，$d_j$ 是 $\symbf{p}_{m}^{w}$ 在相机坐标系中的深度，$[\cdot]_{0:2}$ 表示选择向量的前两个元素。需要注意的是，$E_i$ 表示单张图像的重投影误差，因此整个BA是对输入图像序列中的所有重投影误差进行累积优化的结果。BA的进行需要使用非线性优化方法，例如高斯-牛顿法或者Levenberg-Marquardt法，这需要误差函数\eqref{eq:reproj_error}关于参数$\symbf{T}^{k_i}_w$和$\symbf{p}_{m}^{w}$的雅可比矩阵，优化过程及雅可比矩阵的推导参考附录~\ref{appendix:bundle_adjustment}。
 
 
 \section{建图对齐}
