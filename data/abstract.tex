@@ -3,37 +3,39 @@
 % 中英文摘要和关键字
 
 \begin{abstract}
-  论文的摘要是对论文研究内容和成果的高度概括。
-  摘要应对论文所研究的问题及其研究目的进行描述，对研究方法和过程进行简单介绍，对研究成果和所得结论进行概括。
-  摘要应具有独立性和自明性，其内容应包含与论文全文同等量的主要信息。
-  使读者即使不阅读全文，通过摘要就能了解论文的总体内容和主要成果。
+  近年来，固定路线中运行的车辆、机器人等智能体越来越受到研究者关注，而定位是这类智能体的基础性功能之一，因此固定路线中的定位有着重要的研究意义和应用价值。以往的定位方法一般需要使用高精度的卫星信号或高成本的传感器来实现精确的定位功能，这些昂贵且需要精心维护的设备限制了低成本固定路线智能体的应用。
+  
+  为了平衡低成本传感器和高精度定位的矛盾，本文提出了一种使用视觉惯性信息的固定路线定位方法。本文方法提出了从建图到定位的完整流程，并分别从离线建图、里程计、地图定位三个方面针对现有方案中的问题进行了改进：
 
-  论文摘要的书写应力求精确、简明。
-  切忌写成对论文书写内容进行提要的形式，尤其要避免“第 1 章……；第 2 章……；……”这种或类似的陈述方式。
+  (1) 现有基于同步定位与地图创建(Simultaneous Localization And Mapping, SLAM)的建图方案往往缺少全局优化，存在精度劣势。针对这一问题本文提出了一种基于运动恢复结构(Structure from Motion, SfM)并融合了高精度全局信息的离线建图方法。这一方法结合了SfM的全局优化精度优势和全局信息所提供的尺度信息，能够恢复出高精度且具有真实尺度的视觉点云地图。
 
-  关键词是为了文献标引工作、用以表示全文主要内容信息的单词或术语。
-  关键词不超过 5 个，每个关键词中间用分号分隔。
+  (2) 现有的基于通用场景设计的视觉惯性里程计(Visual-Inertial Odometry, VIO)，忽略了车辆和轮式机器人的运动学先验知识。针对这一问题本文提出了一种基于车身运动伪观测约束的VIO。这一方法首先对车身状态进行分类和估计，此后首先粗略估计车身与惯性传感器的标定参数，并将车身横向和重力方向的零速度伪观测作为约束，联合优化车身状态和标定参数，获得了精读更高的VIO。
+
+  (3) 现有的地图定位方法普遍将定位问题看作是基于地图观测的最大似然估计问题进行优化，而忽略了地图本身可能存在的误差。针对这一问题本文提出了一种基于先验地图信息的最大后验概率估计方法来完成定位操作。这一方法在定位过程中将地图点看作是以建图所得空间坐标为中心的高斯分布，基于这一先验概率进行位置和姿态的最大后验概率估计，有效减小了建图误差带来的定位误差。
+
+  本文所提出的方法在3个公开数据集上分别针对离线建图、里程计、地图定位进行实验，论证了本文所提出方法的有效性，还通过消融实验分析了各个模块的有效性。实验表明，本文所提出的固定路线中的视觉惯性定位方法有着较高的定位精度，在理想场景下可以达到厘米级的定位精度，并且可以适应天气、光照变化等环境因素改变的场景。
 
   % 关键词用“英文逗号”分隔，输出时会自动处理为正确的分隔符
   \thusetup{
-    keywords = {关键词 1, 关键词 2, 关键词 3, 关键词 4, 关键词 5},
+    keywords = {固定路线, 状态估计, 同步定位与地图创建, 视觉惯性里程计},
   }
 \end{abstract}
 
 \begin{abstract*}
-  An abstract of a dissertation is a summary and extraction of research work and contributions.
-  Included in an abstract should be description of research topic and research objective, brief introduction to methodology and research process, and summary of conclusion and contributions of the research.
-  An abstract should be characterized by independence and clarity and carry identical information with the dissertation.
-  It should be such that the general idea and major contributions of the dissertation are conveyed without reading the dissertation.
+  In recent years, intelligent agents operating on fixed routes—such as vehicles and robots—have attracted growing research interest. Localization, as one of their fundamental functions, is of considerable research significance and practical value. Conventional localization methods typically rely on high-precision satellite signals or expensive sensors to achieve accurate positioning; however, these costly and maintenance-intensive devices hinder the application of low-cost fixed-route intelligent agents.
 
-  An abstract should be concise and to the point.
-  It is a misunderstanding to make an abstract an outline of the dissertation and words “the first chapter”, “the second chapter” and the like should be avoided in the abstract.
+  To reconcile the trade-off between low-cost sensors and high-accuracy localization, this paper introduces a visual–inertial localization method specifically designed for fixed-route applications. The proposed framework offers a comprehensive pipeline spanning from mapping to localization, with key enhancements in three areas: offline mapping, Visual–Inertial Odometry (VIO), and map-based localization.
 
-  Keywords are terms used in a dissertation for indexing, reflecting core information of the dissertation.
-  An abstract may contain a maximum of 5 keywords, with semi-colons used in between to separate one another.
+  (1) Conventional Simultaneous Localization And Mapping (SLAM) methods often suffer from a lack of global optimization, leading to suboptimal accuracy. To address this, we introduce an offline mapping method based on Structure from Motion (SfM) that integrates high-precision global information. This method leverages the global optimization advantages of SfM and the scale information provided by global data to reconstruct a high-precision, metrically accurate visual point cloud map.
+
+  (2) Existing VIO systems designed for general scenarios tend to overlook the kinematic priors inherent in vehicles and wheeled robots. In response, we propose a VIO approach that incorporates pseudo-observation constraints based on vehicle kinematics. The method first classifies and estimates the vehicle state, performs an initial coarse calibration between the vehicle body and the inertial sensor, and then applies zero-velocity constraints along the lateral and gravitational axes to jointly optimize the vehicle state and calibration parameters, thereby improving VIO accuracy.
+
+  (3) Most map-based localization methods treat the localization problem as a maximum likelihood estimation based solely on map observations, neglecting potential mapping errors. To overcome this limitation, we propose a maximum a posteriori estimation framework that integrates prior map information. By modeling map points as Gaussian distributions centered on the coordinates obtained during mapping, our method effectively mitigates localization errors caused by mapping inaccuracies.
+
+  Extensive experiments on three publicly available datasets—covering offline mapping, odometry, and map localization—demonstrate the effectiveness of the proposed approach. Ablation studies further confirm the contributions of each module. Under ideal conditions, our method achieves centimeter-level localization accuracy and exhibits robustness to variations in weather and lighting conditions.
 
   % Use comma as separator when inputting
   \thusetup{
-    keywords* = {keyword 1, keyword 2, keyword 3, keyword 4, keyword 5},
+    keywords* = {fixed route, state estimation, SLAM, VIO},
   }
 \end{abstract*}

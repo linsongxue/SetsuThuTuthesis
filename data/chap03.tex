@@ -84,6 +84,7 @@
 \end{figure}
 
 \section{车身状态判别}
+\label{sec:vehicle_state}
 
 根据对车身状态的分析，只有在车辆和机器人停止或直线行驶时，才能添加额外的约束。因此，需要在视觉惯性里程计中添加车身状态判别模块，以区分车辆的运动状态。以往的工作中，\citet{hu2020memsimu}使用传统的统计方法来判别车辆的直行、变道和转弯等状态；\citet{brossard2020ai}使用卷积神经网络(Convolutional Neural Network, CNN)来生成车身3个轴向的测量噪声，以此来间接判别车辆状态；\citet{huang2022vehicle}则使用时间卷积神经网络(Temporal Convolutional Neural Network, TCN)根据IMU观测值来接判别车辆的运动状态。然而，基于统计的判别方法需要事先采集IMU静止状态下的数据进行统计分析，不够灵活；基于CNN和TCN的方法针对每一条IMU数据进行判别，这在应用于高频率IMU(例如2000Hz及以上)时会造成极大的时延。针对以上问题，本文希望使用一种更加灵活，并且有望实时进行的方法来进行车身状态判别。
 
@@ -131,7 +132,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \begin{table}
   \centering
   \caption{车身判别网络设计参数}
-  \begin{tabular}{ccccccc}
+  \begin{tabular}{lcccccc}
   \toprule
   层 & 层类型                 & 输入维度 & 特征维度 & 前馈层维度 & 头数 & 输出维度 \\
   \midrule
@@ -146,7 +147,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \label{tab:network}
 \end{table}
 
-对于网络结构，本文希望其能够输入一个可变形状矩阵$\symbf{X}$，稳定输出向量$\symbf{z}$。因此，本文使用了经典的Encoder-Decoder架构Transformer\cite{vaswani2017attention}：其网络的基本参数如表~\ref{tab:network} 所示。除了表中所示的神经网络层以外，本文网络中还有一个可训练参数$\symbf{q} \in \mathbb{R}^{128}$用于和两层Transformer Decoder进行交互已获得带有车身状态特征的向量$\symbf{q}' \in \mathbb{R}^{128}$，$\symbf{q}'$此后经全连接层获得预测向量$\symbf{y} \in \mathbb{R}^2$，$\symbf{y}$经过Sigmoid函数后得到预测的车身状态概率$\symbf{y} \in (0, 1)^2$。
+对于网络结构，本文希望其能够输入一个可变形状矩阵$\symbf{X}$，稳定输出向量$\symbf{z}$。因此，本文使用了经典的Encoder-Decoder架构Transformer\cite{vaswani2017attention}：其网络的基本参数如表~\ref{tab:network} 所示。除了表中所示的神经网络层以外，本文网络中还有一个可训练参数$\symbf{q} \in \mathbb{R}^{128}$用于和两层Transformer Decoder进行交互已获得带有车身状态特征的向量$\symbf{q}' \in \mathbb{R}^{128}$，$\symbf{q}'$此后经全连接层获得预测向量$\symbf{y} \in \mathbb{R}^2$，$\symbf{y}$经过Sigmoid函数后得到预测的车身状态概率$\symbf{y} \in (0, 1)^2$，此后以$\tau$为阈值，将$\symbf{y} > \tau$作为正例预测，因为本文方法对车身状态判断的查准率要求较高，因此这个阈值将取一个较大的值。
 
 \subsection{网络训练}
 
