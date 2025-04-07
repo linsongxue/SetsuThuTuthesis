@@ -1,0 +1,129 @@
+% !TeX root = ../thuthesis-example.tex
+
+\chapter{正文省略的公式推导}
+% \label{appendix:quat}
+
+\section{非线性优化目标函数中的视觉观测残差函数}
+\label{appendix:nonlinear_optimization}
+
+与传统的小孔相机模型在通用图像平面上定义重投影误差不同，这里我们在单位球面上定义相机测量残差。包括广角、鱼眼和全向相机在内的几乎所有类型的相机光学系统，都可视作由单位球面表面发出的单位射线来进行建模。考虑在第 $i$ 帧图像中首次观测到的第 $l$ 个特征，其在第 $j$ 帧图像中的测量残差定义如下：
+\begin{equation}
+r_{C}\bigl(\hat{\symbf{z}}_l^{c_j}, \mathcal{X}\bigr) 
+= 
+\begin{bmatrix}
+\symbf{e}_1 & \symbf{e}_2
+\end{bmatrix}^\mathrm{T}
+\left(
+  \overline{\symbf{p}}_l^{c_j} - \frac{\symbf{p}_l^{c_j}}{\bigl\|\symbf{p}_l^{c_j}\bigr\|}
+\right),
+\end{equation}
+其中，$\overline{\symbf{p}}_l^{c_j}$定义为
+\begin{equation}
+\overline{\symbf{p}}_l^{c_j} = \pi_c^{-1}(\hat{\symbf{z}}_l^{c_j}),
+\end{equation}
+其中 $\pi_c^{-1}(\cdot)$ 表示将像素坐标映射到单位球面上的函数。$\symbf{p}_l^{c_j}$ 定义为：
+\begin{equation}
+\symbf{p}_l^{c_j} = \symbf{R}_b^c \cdot
+\Bigl( 
+  \symbf{R}_{o}^{b_j}
+  \bigl( 
+    \symbf{R}_{b_i}^{o}
+    (
+      \symbf{R}_c^{b} \frac{1}{\lambda_l}\pi_c^{-1}(\hat{\symbf{z}}_l^{c_j}) + \symbf{p}_c^b
+    ) + \symbf{p}_{b_i}^{o} - \symbf{p}^{o}_{b_j}
+  \bigr) - \symbf{p}_{b}^{c}
+\Bigr),
+\end{equation}
+在上述公式中，$\hat{\symbf{z}}_l^{c_j}$ 表示第 $j$ 帧对第 $l$ 个特征的观测，$\lambda_l$ 通常为特征深度或逆深度参数。
+
+
+\section{预积分公式}
+\label{appendix:preintegration}
+惯性信息由 IMU 测量获得，主
+要包含IMU坐标系下测量的角速度$\hat{\symbf{\omega}}\in\mathcal{R}^3$和加速度$\hat{\symbf{a}}\in\mathcal{R}^3$，
+测量值和真实物理量的对应关系为
+\begin{equation}
+    \hat{\symbf{\omega}} = \symbf{\omega} + \symbf{b}_{\omega} + \symbf{n}_{\omega}
+\end{equation}
+\begin{equation}
+  \hat{\symbf{a}} = \symbf{a} + \symbf{R}_o^b \symbf{g}^o + \symbf{b}_a + \symbf{n}_{a},
+\end{equation}
+其中$\symbf{\omega}$表示当前机体真实的角速度，$\symbf{a}$表示当前机体真实的加速度，
+$\symbf{b}_{\omega}$和$\symbf{b}_a$分别表示IMU测量角速度和加速度的系统误差，
+$\symbf{n}_{\omega}$和$\symbf{n}_{a}$分别表示IMU测量角速度和加速度的随机噪声，$\symbf{R}_o^b$表示
+从定位VIO世界坐标系到体坐标系的旋转矩阵，$\symbf{g}^o$表示重力加速度在定位VIO世界坐标系的量。
+
+根据IMU测量的
+加速度和角速度，应用运动学公式，可以计算两个离散时刻的运动关系：假设两个时刻分别为$t_i$和$t_{i+1}$，则两时刻之间的位移关系在
+定位VIO世界坐标系下可以表示为：
+\begin{equation}
+  \label{eq:position}
+  \symbf{p}_{b_{i+1}}^o=\symbf{p}_{b_i}^o+\symbf{v}_{b_i}^o\cdot\Delta t_i+\iint_{t_i}^{t_{i+1}}[\symbf{R}_t^o(\symbf{\hat{a}}^t-\symbf{b}_{a}-\symbf{n}_{a})-\symbf{g}^o]dt^2,
+\end{equation}
+其中$\symbf{p}_{b_{i}}^o$表示$t_i$时刻定位体坐标系在定位VIO世界坐标系下的位置，$\symbf{v}_{b_i}^o$表示$t_i$时刻定位体坐标系在定位VIO世界坐标系下的速度，
+$\Delta t_i$表示两时刻间时间段的长度，$\symbf{R}_t^o$表示在$t$时刻定位体坐标系在定位视觉坐标系下的旋转矩阵$\symbf{R}_t^o|_{t=t_i}=\symbf{R}_{b_i}^o$。
+两时刻之间的速度关系在定位VIO世界坐标系下可以表示为：
+\begin{equation}
+  \label{eq:velocity}
+  \symbf{v}_{b_{i+1}}^o=\symbf{v}_{b_i}^o+\int_{t_i}^{t_{i+1}}[\symbf{R}_t^o(\symbf{\hat{a}}^t-\symbf{b}_a-\symbf{n}_a)-\symbf{g}^o]dt.
+\end{equation}
+两时刻之间的旋转关系可以用旋转矩阵表示，
+但是由于矩阵的计算复杂度较高，因此通常使用四元数表示，即：
+\begin{equation}
+  \label{eq:rotation}
+  \symbf{q}_{b_{i+1}}^o=\symbf{q}_{b_i}^o\otimes\int_{t_i}^{t_{i+1}}\frac12\Omega(\widehat{\symbf{\omega}}^t-\symbf{b}_\omega-\symbf{n}_\omega)\symbf{q}_t^{b_i}dt,
+\end{equation}
+其中$\symbf{q}_{b_i}^o$表示$t_i$时刻定位体坐标系在定位世界坐标系中为旋转四元数，$\otimes$表示四元数乘法。
+
+观察上述运动学公式可以发现其存在两个问题：1.后一时刻的状态量以前一时刻的状态量为积分起点，如果前一时刻的状态量发生变化，则后一时刻状态量需要通过重新积分来计算；
+2.运动学公式中的积分项中存在系统误差分量，这些系统误差可能会在IMU工作过程中变化，所以需要随时估计，但一旦改变其值，则整个积分过程也
+要重新计算。这两点问题的存在导致不便直接使用原始状态的运动学公式，因此引出了预积分的概念。预积分为了解决第一个问题，首先将所有的状态量的积分起点
+从定位世界坐标系转换到不同时刻的定位体坐标系，即在式\eqref{eq:position}\eqref{eq:velocity}\eqref{eq:rotation}前乘以旋转矩阵
+$\symbf{R}_o^{b_i}$或者与之等价的四元数$\symbf{q}_o^{b_i}$，使得三式改写为：
+\begin{equation}
+  \label{eq:relposition}
+  \symbf{R}_o^{b_i}\symbf{p}_{b_{i+1}}^o=\symbf{R}_o^{b_i}(\symbf{p}_{b_i}^o+\symbf{v}_{b_i}^o\cdot\Delta t_i - \frac{1}{2}\symbf{g}^o{\Delta t_i}^2)+\symbf{\alpha}_{b_{i+1}}^{b_i},
+\end{equation}
+\begin{equation}
+  \label{eq:relvolicity}
+  \symbf{R}_o^{b_i}\symbf{v}_{b_{i+1}}^o=\symbf{R}_o^{b_i}(\symbf{v}_{b_i}^o-\symbf{g}^o\Delta t_i)+\symbf{\beta}_{b_{i+1}}^{b_i},
+\end{equation}
+\begin{equation}
+  \label{eq:relrotation}
+  \symbf{q}_o^{b_i}\symbf{q}_{b_{i+1}}^o=\symbf{\gamma}_{b_{i+1}}^{b_i},
+\end{equation}
+其中$\symbf{\alpha}_{b_{i+1}}^{b_i},\symbf{\beta}_{b_{i+1}}^{b_i},\symbf{\gamma}_{b_{i+1}}^{b_i}$直接建模了
+两时刻之间的位移、速度和旋转关系，而且积分起点不再依赖于前一时刻的状态量，具体而言：
+\begin{equation}
+  \label{eq:preintposition}
+  \symbf{\alpha}_{b_{i+1}}^{b_i}=\iint_{t_i}^{t_{i+1}}\symbf{R}_t^{b_i}(\symbf{\hat{a}}^t-\symbf{b}_{a}-\symbf{n}_{a}) dt^2,
+\end{equation}
+\begin{equation}
+  \label{eq:preintvelocity}
+  \symbf{\beta}_{b_{i+1}}^{b_i}=\int_{t_i}^{t_{i+1}}\symbf{R}_t^{b_i}(\symbf{\hat{a}}^t-\symbf{b}_{a}-\symbf{n}_{a}) dt,
+\end{equation}
+\begin{equation}
+  \label{eq:preintrotation}
+  \symbf{\gamma}_{b_{i+1}}^{b_i}=\int_{t_i}^{t_{i+1}}\frac12\Omega(\widehat{\symbf{\omega}}^t-\symbf{b}_\omega-\symbf{n}_\omega)\symbf{q}_t^{b_i}dt.
+\end{equation}
+其中积分起点$\symbf{R}_t^{b_i}|_{t=t_i}=\symbf{R}_{b_i}^{b_i}=\symbf{I}$，即起点固定为无旋转。至此，预积分模型完成了
+积分项与前一时刻状态量的分离，只关注相邻时刻的变化情况，即解决了传统运动学公式的第一个问题。
+
+至此，虽然预积分公式完成了对上一步状态量的独立，但是式\eqref{eq:preintposition}\eqref{eq:preintvelocity}\eqref{eq:preintrotation}
+还有关于系统误差的项。为了避免在修正这些系统误差项后需要对整个积分过程重新计算，预积分模型一般选择一个系统误差初值，然后在其周围进行线性化，
+使得预积分的更新方式可以变为：
+\begin{equation}
+  \symbf{\alpha}_{b_{i+1}}^{b_i} = \hat{\symbf{\alpha}}_{b_{i+1}}^{b_i} + J^{\alpha}_{b_a} \cdot \delta \symbf{b}_a + J^{\alpha}_{b_{\omega}} \cdot \delta \symbf{b}_{\omega}
+\end{equation}
+\begin{equation}
+  \symbf{\beta}_{b_{i+1}}^{b_i} = \hat{\symbf{\beta}}_{b_{i+1}}^{b_i} + J^{\beta}_{b_a} \cdot \delta \symbf{b}_a + J^{\beta}_{b_{\omega}} \cdot \delta \symbf{b}_{\omega}
+\end{equation}
+\begin{equation}
+  \symbf{\gamma}_{b_{i+1}}^{b_i} = \hat{\symbf{\gamma}}_{b_{i+1}}^{b_i} \otimes \begin{bmatrix}
+    1 \\ \frac12 J^{\gamma}_{b_{\omega}} \cdot \delta \symbf{b}_{\omega}
+  \end{bmatrix}
+\end{equation}
+其中$\hat{\symbf{\alpha}}_{b_{i+1}}^{b_i},\hat{\symbf{\beta}}_{b_{i+1}}^{b_i},\hat{\symbf{\gamma}}_{b_{i+1}}^{b_i}$为基于初始
+系统误差的预积分估计结果，$J^{\alpha}_{b_a},J^{\alpha}_{b_{\omega}},J^{\beta}_{b_a},J^{\beta}_{b_{\omega}},J^{\gamma}_{b_{\omega}}$为
+预积分结果对系统误差的雅可比矩阵，$\delta \symbf{b}_a,\delta \symbf{b}_{\omega}$为系统误差的更新量。这样，预积分模型就可以不需要重新积分，而只
+进行增量更新，从而解决了传统运动学公式的第二个问题。

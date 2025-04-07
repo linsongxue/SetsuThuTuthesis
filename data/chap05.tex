@@ -3,11 +3,12 @@
 \externaldocument{chap04}
 
 
-\chapter{固定路线中视觉惯性定位系统搭建与测试}
+\chapter{视觉惯性定位系统搭建与测试}
 
-本章主要对定位系统的搭建即实施进行介绍。首先介绍了定位系统运行所依靠的硬件平台以及软件环境，不同于一般的定位系统，本文方法的实施依赖于深度学习及图形处理单元(Graphics processing unit, GPU)。然后介绍了本文所使用的数据集以及评价指标，本文实验主要建立在3个数据集上，分别是KITTI数据集、4Seasons数据集和KAIST数据集，其中KITTI数据集场景相对单一，适合验证离线建图模块的性能，以及初步验证定位模块的性能；4Seasons数据集提供的场景丰富，适合验证视觉惯性里程计和紧耦合地图定位模块的性能；KAIST数据集提供了超长轨迹，适合验证视觉惯性里程计模块的性能。最后本章介绍了定位系统三个模块的测试结果，并通过相应的消融实验来验证各部分的真实作用。
+本章主要对定位系统的搭建即实施进行介绍。首先介绍了定位系统运行所依靠的硬件平台以及软件环境，不同于一般的定位系统，本文方法的实施依赖于深度学习及图形处理单元(Graphics processing unit, GPU)。然后介绍了本文所使用的数据集以及评价指标，本文实验主要建立在3个数据集上，分别是KITTI数据集、4Seasons数据集和KAIST数据集，其中KITTI数据集场景相对单一，适合验证离线建图模块的性能，以及初步验证定位模块的性能；4Seasons数据集提供的场景丰富，适合验证VIO和紧耦合地图定位模块的性能；KAIST数据集提供了超长轨迹，适合验证VIO模块的性能。最后本章介绍了定位系统三个模块的测试结果，并通过相应的消融实验来验证各部分的真实作用。
 
-\section{系统搭建细节}
+\section{系统与测试细节}
+\subsection{硬件与软件环境}
 
 本文所设计的定位系统的运行环境依赖于同时具有CPU(Central processing unit)和GPU(Graphics processing unit)的计算机，具体来说本文所实验的平台使用12th Gen Intel(R) Core(TM) i7-12700 CPU和NVIDIA GeForce RTX 3080 GPU。
 
@@ -30,23 +31,25 @@
 \toprule
 参数名 & 首次出现章节 & 作用 & 取值 \\
 \midrule
+$t_l$ & \ref{sec:map_sfm} & SfM中回环检测相似度阈值 & 0.8 \\
+$m$ & \ref{sec:map_sfm} & SfM中回环帧数量 & 5 \\
 $\alpha$ &  \ref{sec:map_fusion}  & 建图融合权重系数     & 1000 \\
-$\tau$ & \ref{sec:vehicle_state} & 车辆状态正例预测阈值 & 0.9 \\
-$N_c$ & \ref{sec:c2f_loc}  & 粗到细匹配候选关键帧数量 & 7   \\
-$t_r$ &  \ref{sec:c2f_loc}  & 投票过程相对旋转角度阈值 & $15\degree$   \\
-$t_p$ &  \ref{sec:c2f_loc}  & 投票过程相对位移阈值   & 5m    \\
+$\tau$ & \ref{sec:network_design} & 车辆状态正例预测阈值 & 0.9 \\
+$N_c$ & \ref{sec:loc_vote}  & 粗到细匹配候选关键帧数量 & 7   \\
+$t_r$ &  \ref{sec:loc_vote}  & 投票过程相对旋转角度阈值 & $15\degree$   \\
+$t_p$ &  \ref{sec:loc_vote}  & 投票过程相对位移阈值   & 5m    \\
 $\lambda_r$ &  \ref{sec:valid}  & 有效性验证角度阈值    & $60\degree$   \\
 $\lambda_p$ &  \ref{sec:valid}  & 有效性验证位移阈值    & 15m   \\
-$N$ &  \ref{sec:tight_opt}  & 滑动窗口容量       & 20   \\
-$\kappa$ &  \ref{sec:tight_opt}  & 单帧图像所考虑的点云比例 & 10  \\
+$N$ &  \ref{sec:loc_pg}  & 滑动窗口容量       & 20   \\
+$\kappa$ &  \ref{sec:loc_pg}  & 单帧图像所考虑的点云比例 & 10  \\
 \bottomrule
 \end{tabular}
 \label{tab:hyperparameters}
 \end{table}
 
-\section{数据集与评价指标}
-\subsection{KITTI数据集}
-KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎的数据集之一，它包含多个小时的交通场景数据，这些数据通过多种传感器采集，包括高分辨率RGB立体相机、灰度立体相机以及3D激光扫描仪。该数据集提供了11条经过精心选择的序列，构成视觉里程计基准。每条序列包含来自四个相机的数据：两个灰度相机和两个彩色相机。此外，KITTI 数据集还为这11条视觉里程计基准序列中的10条提供了原始GNSS观测数据和IMU测量数据。
+\subsection{测试数据集与评价指标}
+\subsubsection{KITTI数据集}
+KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎且使用广泛的数据集之一，它包含大量的多种传感器采集的交通场景数据，包括高分辨率RGB双目相机图像、灰度双目相机图像以及3D激光雷达数据。该数据集提供了11条经过精心选择的序列，构成视觉里程计基准。每条序列包含来自四个相机的数据：两个灰度相机和两个彩色相机。此外，KITTI 数据集还为这11条视觉里程计基准序列中的10条提供了原始GNSS观测数据和IMU测量数据。
 
 \begin{figure}
   \centering
@@ -60,7 +63,7 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
 
 本文使用KITTI视觉里程计基准中包含GNSS观测数据的10条序列，评估本文所提出系统的建图性能以及整体性能。这10条序列包括了城镇、高架、郊外以及农村等常见的车辆行驶环境，如图~\ref{fig:kitti_data} 所示。
 
-\subsection{4Seasons数据集}
+\subsubsection{4Seasons数据集}
 4Seasons数据集\cite{wenzel20214seasons}是一个专为自动驾驶研究设计的数据集，提供了涵盖季节变化和复杂感知条件的图像、IMU等数据。同一路径在不同季节和多种感知条件下被多次采集，使其特别适合于评估针对固定路径设计的方法。该数据集使用的传感器包括立体相机、IMU和RTK-GNSS，同时还提供了精度达到厘米级的高精度真值位姿。
 
 与KITTI数据集相比，4Seasons数据集能够提供更具挑战性和说服力的实验结果，突出了本文方法的优势。本文选择了四个具有代表性的场景，分别是
@@ -104,10 +107,10 @@ KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎�
   \label{fig:OT_data}
 \end{figure}
 
-\subsection{KAIST数据集}
+\subsubsection{KAIST数据集}
 KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ranging)、立体相机、GPS、IMU、编码器和气压计等多种传感器数据，使得用户可以针对不同传感器组合进行多模态信息处理。采集环境涵盖了从多车道宽阔道路到高密度城市街区等多种复杂场景，这不仅体现了实际城市环境中GPS信号不稳定、遮挡严重等问题，也为算法在动态、遮挡等极端条件下的鲁棒性验证提供了真实数据。此外，数据集通过高精度传感器与消费者级传感器的双层数据采集，以及精细的时间同步和标定处理，确保了数据的高准确性和一致性，并提供了基准轨迹及ROS工具，极大地方便了机器人定位、SLAM及环境感知等相关领域的研究与测试。
 
-本文中主要选择了KAIST数据集中的三个场景，分别是20-Highway、26-Dongtan和28-Pangyo，如图~\ref{fig:KAIST_data} 所示。这三个场景分别代表了高速公路、郊区和城市环境，适合于测试本文方法在不同场景下的性能。其中28-Pangyo是一段超过10公里的城市环境，包含了大量的建筑物、行人和车辆，是一个非常具有挑战性的场景。KAIST数据集主要被使用来评估本文的视觉惯性里程计模块性能。
+本文中主要选择了KAIST数据集中的三个场景，分别是20-Highway、26-Dongtan和28-Pangyo，如图~\ref{fig:KAIST_data} 所示。这三个场景分别代表了高速公路、郊区和城市环境，适合于测试本文方法在不同场景下的性能。其中28-Pangyo是一段超过10公里的城市环境，包含了大量的建筑物、行人和车辆，是一个非常具有挑战性的场景。KAIST数据集主要被使用来评估本文的VIO模块性能。
 
 \begin{figure}
   \centering
@@ -121,7 +124,7 @@ KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ra
   \label{fig:KAIST_data}
 \end{figure}
 
-\subsection{数据集使用划分}
+\subsubsection{数据集使用划分}
 
 由于本文需要分别验证3个模块的效果，因此本文将数据集的划分总结如表~\ref{tab:dataset_usage} 所示。表中的每一列代表了一个测试模块，每一行代表了一个数据集，表中的符号代表了数据集的使用方法，其中{\color[HTML]{3166FF} $\bigcirc$}代表使用该序列进行训练或者建图，{\color[HTML]{FD6864}$\bigtriangleup$}代表使用该序列进行测试。
 
@@ -133,9 +136,9 @@ KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ra
 \toprule
 \multirow{2}{*}{测试模块} & \multicolumn{2}{c}{KITTI}               & \multicolumn{4}{c}{4Seasons}   & KAIST                                         \\ \cline{2-8} 
                   & 灰色                          & 彩色         & OF1              & OF2-5            & \begin{tabular}[c]{@{}c@{}}NH1 \\ BC1 \\ OT1\end{tabular} & \begin{tabular}[c]{@{}c@{}}NH2-7 \\ BC2-3 \\ OT2-3\end{tabular} & \begin{tabular}[c]{@{}c@{}}20-Highway  \\ 26-Dongtan \\ 28-Pangyo\end{tabular} \\ \midrule
-离线建图 & {\color[HTML]{3166FF} $\bigcirc$}{\color[HTML]{FD6864}$\bigtriangleup$} &            &                  &                  &               &         &          \\
-视觉惯性里程计           &                             &            & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    &         &     {\color[HTML]{FD6864}$\bigtriangleup$}     \\
-紧耦合地图定位           & {\color[HTML]{FD6864}$\bigtriangleup$}           & {\color[HTML]{3166FF} $\bigcirc$} & {\color[HTML]{3166FF} $\bigcirc$}       & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    & {\color[HTML]{FD6864}$\bigtriangleup$} & \\ \bottomrule
+离线建图模块 & {\color[HTML]{3166FF} $\bigcirc$}{\color[HTML]{FD6864}$\bigtriangleup$} &            &                  &                  &               &         &          \\
+PO-VIO模块           &                             &            & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    &         &     {\color[HTML]{FD6864}$\bigtriangleup$}     \\
+地图定位模块           & {\color[HTML]{FD6864}$\bigtriangleup$}           & {\color[HTML]{3166FF} $\bigcirc$} & {\color[HTML]{3166FF} $\bigcirc$}       & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    & {\color[HTML]{FD6864}$\bigtriangleup$} & \\ \bottomrule
 \end{tabular}
 \label{tab:dataset_usage}
 \begin{tablenotes}
@@ -145,15 +148,15 @@ KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ra
 \end{threeparttable}
 \end{table}
 
-KITTI数据集参与离线建图和紧耦合地图定位两个模块的测试：在评估建图过程时，使用来自单目灰度相机的完整图像集；在评估整体性能时由于KITTI数据集未直接提供沿同一路径的多次行驶数据，本文中通过使用不同的相机模拟多次行驶。具体而言，使用部分彩色相机拍摄的图像进行离线建图过程，然后使用灰度相机拍摄的图像测试紧耦合地图定位的精度。建图图像的比例设置为0.25，即只使用四分之一的彩色图像来构建先验地图，并在完整的灰度图像集上进行定位。
+KITTI数据集参与离线建图和地图定位两个模块的测试：在评估建图过程时，使用来自单目灰度相机的完整图像集；在评估整体性能时由于KITTI数据集未直接提供沿同一路径的多次行驶数据，本文中通过使用不同的相机模拟多次行驶。具体而言，使用部分彩色相机拍摄的图像进行离线建图过程，然后使用灰度相机拍摄的图像测试紧耦合地图定位的精度。建图图像的比例设置为0.25，即只使用四分之一的彩色图像来构建先验地图，并在完整的灰度图像集上进行定位。
 
-4Seasons数据集参与视觉惯性里程计和紧耦合地图定位两个模块的测试：在评估视觉惯性里程计时，使用NH1、BC1和OT1的数据作为训练数据，OF1-5作为测试数据；在评估紧耦合地图定位性能时，使用OF1、NH1、BC1和OT1作为建图数据，OF2-5、NH2-7、BC2-3和OT2-3作为测试数据。此外由于紧耦合地图定位模块需要使用视觉惯性里程计结果，而视觉惯性里程计的训练数据与紧耦合地图定位的测试数据没有重合，所以可以直接使用视觉惯性里程计的结果作为紧耦合地图定位的输入而不需要担心训练数据中混入了测试数据。
+4Seasons数据集参与PO-VIO和地图定位两个模块的测试：在评估PO-VIO模块时，使用NH1、BC1和OT1的数据作为训练数据，OF1-5作为测试数据；在评估地图定位性能时，使用OF1、NH1、BC1和OT1作为建图数据，OF2-5、NH2-7、BC2-3和OT2-3作为测试数据。此外由于地图定位模块需要使用PO-VIO结果，而PO-VIO的训练数据与地图定位的测试数据没有重合，所以可以直接使用PO-VIO的结果作为紧耦合地图定位的输入而不需要担心训练数据中混入了测试数据。
 
-KAIST数据集参与视觉惯性里程计模块的测试：使用序列20-Highway、26-Dongtan和28-Pangyo作为测试数据，而此处的车身状态判别神经网络则直接使用4Seasons数据集上的预训练参数。
+KAIST数据集参与PO-VIO模块的测试：使用序列20-Highway、26-Dongtan和28-Pangyo作为测试数据，而此处的车身状态判别神经网络则直接使用4Seasons数据集上的预训练参数。
 
-\subsection{评价指标}
+\subsubsection{评价指标}
 
-本文实验中使用三种不同的指标来评估定位性能：绝对轨迹误差(Absolute Translation Error, ATE)\cite{sturm2012benchmark}和相对位姿误差(Relative Pose Error, RPE)\cite{geiger2012we}。其中绝对轨迹误差只评估位移分量，记做$ATE_t$，单位为米(m)；相对位姿误差评估了相对平移和相对旋转的误差，分别记做$RPE_{t}$和$RPE_{r}$，单位分别为米/100米(m/100m)和度/100米($\degree$/100m)，$RPE_{t}$的计算是在每100米的间隔中计算当前定位结果与真值(Ground Truth)的平移误差，$RPE_{r}$的计算是在每100米的间隔中计算当前定位结果与真值之间的旋转角度误差。
+本文实验中使用绝对轨迹误差(Absolute Translation Error, ATE)\cite{sturm2012benchmark}和相对位姿误差(Relative Pose Error, RPE)\cite{geiger2012we}来评估定位性能。其中绝对轨迹误差只评估位移分量，记做$ATE_t$，单位为“米”(m)；相对位姿误差评估了相对平移和相对旋转的误差，分别记做$RPE_{t}$和$RPE_{r}$，单位分别为“米/100米”(m/100m)和“度/100米”($\degree$/100m)，$RPE_{t}$的计算是在每100米的间隔中计算当前定位结果与真值(Ground Truth)的平移误差，$RPE_{r}$的计算是在每100米的间隔中计算当前定位结果与真值之间的旋转角度误差。
 
 $ATE_t$的计算方式为可以表示为：
 \begin{equation}
@@ -171,7 +174,7 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 在实验结果汇报中，由于KITTI数据集提供的真值格式与其他数据集不同，所以在计算方法中，KITTI由官方提供的计算工具进行计算，数值精度最高保留2位小数；4Seasons和KAIST数据集上的实验结果则使用\citet{grupp2017evo}提出的开源工具包EVO进行计算，精度相对较高，可以保留6位小数，方便更精确的对比。
 
 \section{离线建图模块测试}
-对于离线建图性能，本文以地图关键帧的位姿评估来定量对比建图精度，实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。
+对于离线建图模块的性能测试，本文以地图关键帧的位姿评估来定量对比建图精度，实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。
 
 \begin{table}
 \centering
@@ -242,19 +245,19 @@ VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地
 
 在相对旋转误差$RPE_r$方面，本文方法在大多数序列中也表现出优越性能。相对旋转误差反映了位姿估计的准确性，本文方法和COLMAP都基于离线的三维重建方法，能够实现全局优化，所以两种方的位姿估计精度相较于VINS-Stereo有明显提升。由于GNSS测量不提供旋转约束，本文的方法与COLMAP在旋转精度上的差异较小。
 
-\section{视觉惯性里程计模块测试}
+\section{PO-VIO模块测试}
 
-\subsection{车身状态判别测试}
-视觉惯性里程计的运行过程中使用到了车身状态结果，并且车身状态判别的结果对里程计精度有着重要的影响，因此针对视觉惯性里程计的效果展示首先从车身状态的判别结果开始。
+\subsection{车身运动模式判别方法的性能测试}
+PO-VIO的运行过程中使用到了车身运动模式的判别结果，并且车身运动模式判别的精度对里程计精度有着重要的影响，因此对PO-VIO的效果展示首先从车身运动模式的判别结果开始。
 
-车身状态的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身两个状态$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身状态判别方法在所有指标上均表现出色，具有较高的准确性和鲁棒性。
+车身运动模式的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身运动模式的两个判别因子$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身运动模式判别方法在所有指标上均表现出色，具有较高的准确性和鲁棒性。
 
 \begin{table}
 \centering
-\caption{车身状态预测效果}
+\caption{车身运动模式预测效果}
 \begin{tabular}{lccccc}
 \toprule
-数据集 &  状态量  & 查准率  & 召回率  & F1得分 & 准确率  \\ \midrule
+数据集 &  因子  & 查准率  & 召回率  & F1得分 & 准确率  \\ \midrule
 \multirow{2}{*}{4Seasons} & $z^{FOR}$ & 0.97 & 0.76 & 0.85 & 0.96 \\
                           & $z^{LAT}$ & 0.98 & 0.97 & 0.98 & 0.96 \\ \midrule
 \multirow{2}{*}{KAIST}    & $z^{FOR}$ & 0.65 & 0.74 & 0.69 & 0.98 \\
@@ -264,15 +267,12 @@ VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地
 \label{tab:pose_detection}
 \end{table}
 
-需要注意的是，由于在KAIST数据集上的车身状态判别对于车身状态$z^{FOR}$的查准率较低，因此在后续KAIST数据集测试中，本文放弃了这一车身状态的选择，仅使用车身状态$z^{LAT}$来进行车身运动学约束。
+需要注意的是，由于在KAIST数据集上的车身运动模式判别对于$z^{FOR}$的查准率较低，因此在后续KAIST数据集测试中，本文放弃了这一车身运动模式因子的使用，仅使用车身运动模式因子$z^{LAT}$来进行车身运动学约束。
 
-\subsection{里程计精度测试}
+\subsection{PO-VIO的性能测试}
+
 \subsubsection{4Seasons数据集测试}
-在验证过车身状态判别的效果后，本文将车身状态判别加入到视觉惯性里程计中，在其余序列上与其他几种视觉惯性里程计方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的视觉惯性里程计方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
-
-在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环(Loop Closure)检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的视觉惯性里程计在配合回环检测之后依旧可以取得较好的效果。
-
-另外，有些方法在某些序列上运行失败，所以在表中使用N/A表示；有些方法可以运行成功，但是中途崩溃，产生的轨迹与真值误差过大，所以在表中我们仅汇报误差小于60米的结果，对于误差大于60米的结果我们使用\textgreater{}60表示。
+在验证过车身运动模式判别的效果后，本文将车身运动模式判别加入到VIO中，在其余序列上与其他几种VIO方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的VIO方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
 
 \begin{table}
 \centering
@@ -286,14 +286,14 @@ BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}
 OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
 VINS-Mono       &                         & 15.696389                                & 12.439054                                &20.552186                                & 7.972945                                 & 13.211903                                \\
 ORB-SLAM3*       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FFCCC9}\textbf{6.931078}                                 \\
-本文VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{8.847395}                                 & \cellcolor[HTML]{FFCCC9}\textbf{4.343367}                                 &  \cellcolor[HTML]{FFCCC9}\textbf{17.193425}                                & \cellcolor[HTML]{FFCCC9}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
+本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{8.847395}                                 & \cellcolor[HTML]{FFCCC9}\textbf{4.343367}                                 &  \cellcolor[HTML]{FFCCC9}\textbf{17.193425}                                & \cellcolor[HTML]{FFCCC9}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
 DSO*         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
 OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
 BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
 OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
 VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
 ORB-SLAM3*       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FFCCC9}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FFCCC9}\textbf{5.520636}                                 \\
-本文VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{3.834251}                                 & \cellcolor[HTML]{FFCCC9}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FFCCC9}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
+本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{3.834251}                                 & \cellcolor[HTML]{FFCCC9}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FFCCC9}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
 \end{tabular}
 \label{tab:vio_ate}
 \begin{tablenotes}
@@ -305,7 +305,11 @@ ORB-SLAM3*       &                         & 4.902441                           
 \end{threeparttable}
 \end{table}
 
-从表~\ref{tab:vio_ate} 中可以看出，在单纯的VIO对比中，本文所提出的视觉惯性里程计方法在大多数序列上$ATE_t$表现出色，相较于其他方法具有更高的精度。在VIO+LC的对比中，本文的方法在大多数序列上仍然有最好的表现，但是在OL3和OL5序列上的表现相对较差，ORB-SLAM3在这两个序列上表现较好。此外，本文VIO基于VINS-Mono改进而来，所以在与VINS-Mono的对比中全面领先，说明本文视觉惯性里程计中的改进有一定效果。
+在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环(Loop Closure)检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的PO-VIO在配合回环检测之后依旧可以取得较好的效果。
+
+另外，有些方法在某些序列上运行失败，所以在表中使用N/A表示；有些方法可以运行成功，但是中途崩溃，产生的轨迹与真值误差过大，所以在表中我们仅汇报误差小于60米的结果，对于误差大于60米的结果我们使用\textgreater{}60表示。
+
+从表~\ref{tab:vio_ate} 中可以看出，在单纯的VIO对比中，本文所提出的PO-VIO方法在大多数序列上$ATE_t$表现出色，相较于其他方法具有更高的精度。在VIO+LC的对比中，本文的方法在大多数序列上仍然有最好的表现，但是在OL3和OL5序列上的表现相对较差，ORB-SLAM3在这两个序列上表现较好。此外，本文PO-VIO基于VINS-Mono改进而来，所以在与VINS-Mono的对比中全面领先，说明本文PO-VIO中的改进有一定效果。
 
 \begin{table}
 \centering
@@ -317,11 +321,11 @@ ORB-SLAM3*       &                         & 4.902441                           
 OpenVINS  & \multirow{4}{*}{$RPE_t$} & 7.576759          & 8.893709          & 12.631715         & N/A               & N/A               \\
 VINS-Mono &                       & 3.921487          & 2.330876          & 5.648737          & 3.447067          & 2.598062          \\
 ORB-SLAM3* &                       & \cellcolor[HTML]{FFCCC9}\textbf{1.962480} & 2.361792          & \cellcolor[HTML]{FFCCC9}\textbf{4.987597} & \cellcolor[HTML]{FFCCC9}\textbf{2.963017} & \cellcolor[HTML]{FFCCC9}\textbf{1.176156} \\
-本文VIO      &                       & 3.459246          & \cellcolor[HTML]{FFCCC9}\textbf{1.986364} & 5.887755          & 3.731419          & 3.227312          \\ \midrule
+本文PO-VIO      &                       & 3.459246          & \cellcolor[HTML]{FFCCC9}\textbf{1.986364} & 5.887755          & 3.731419          & 3.227312          \\ \midrule
 OpenVINS  & \multirow{4}{*}{$RPE_r$} & 2.122706          & 1.752747          & 3.904525          & N/A               & N/A               \\
 VINS-Mono &                       & 1.062495          & 0.783557          & 3.411987          & 1.747575          & 0.990526          \\
 ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.002619          & 1.764101          & 0.981966          \\
-本文VIO       &                       & \cellcolor[HTML]{FFCCC9}\textbf{0.818242} & \cellcolor[HTML]{FFCCC9}\textbf{0.776345} & \cellcolor[HTML]{FFCCC9}\textbf{2.543815} & \cellcolor[HTML]{FFCCC9}\textbf{1.732620} & \cellcolor[HTML]{FFCCC9}\textbf{0.882806} \\ \bottomrule
+本文PO-VIO       &                       & \cellcolor[HTML]{FFCCC9}\textbf{0.818242} & \cellcolor[HTML]{FFCCC9}\textbf{0.776345} & \cellcolor[HTML]{FFCCC9}\textbf{2.543815} & \cellcolor[HTML]{FFCCC9}\textbf{1.732620} & \cellcolor[HTML]{FFCCC9}\textbf{0.882806} \\ \bottomrule
 \end{tabular}
 \label{tab:vio_rpe}
 \begin{tablenotes}
@@ -332,9 +336,57 @@ ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.0
 \end{threeparttable}
 \end{table}
 
-从表~\ref{tab:vio_rpe} 中的结果可以看出，本文VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至VINS-Mono；但是在相对旋转误差$RPE_r$上，本文VIO在所有序列上均表现出色，具有更高的精度。产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
+从表~\ref{tab:vio_rpe} 中的结果可以看出，本文PO-VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至VINS-Mono；但是在相对旋转误差$RPE_r$上，本文PO-VIO在所有序列上均表现出色，具有更高的精度。
 
-为了验证这一猜想，本文对车身坐标系的速度量进行分析。分析建立在OF2和OF3两条序列上，这两条序列有着比较突出的特点：OF2序列上本文视觉惯性里程计的$RPE_t$和$RPE_r$均有所提升，但是整体幅度较小；OF3序列上本文视觉惯性里程计的$RPE_t$有所下降，但是$RPE_r$有所提升，而且每100米的旋转误差减小了接近1度。因此选择这两条序列进行分析，能够更好发现本文的速度伪观测约束在何种条件下会对里程计的效果产生积极影响。两条序列上的速度量在车身坐标系的变化如图~\ref{fig:VIO_velocity} 所示。
+产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
+
+\subsubsection{KAIST数据集测试}
+
+KAIST数据集上的测试如表~\ref{tab:vio_kaist} 所示，表中展示了本文设计的PO-VIO在KAIST数据集上的效果对比，对比方法包括基线\cite{qin2018vins}和本文设计的PO-VIO。
+
+此外为了方便对比，表中还展示了本文设计相对于基线的改进变化量$\Delta$，用红底表示在该指标下进步，绿底表示在该指标下有所退化。在指标方面，此处将常规的$ATE_t$改变为$ATE_t$/km，即每公里的绝对轨迹误差，以平衡里程计在不同行驶距离下的精度表现。
+
+\begin{table}
+\centering
+\begin{threeparttable}
+\caption{KAIST数据集视觉惯性里程计效果对比}
+\begin{tabular}{lccccc}
+\toprule
+序列                           & 长度                         & 方法         & $ATE_t$/km\textdownarrow{} & $RPE_t$\textdownarrow{}                           & $RPE_r$\textdownarrow{}  \\ \midrule
+                              &                            & 基线 & 27.551458   & 19.496478                         & 1.165007 \\
+                              &                            & 本文PO-VIO      & 26.003915   & 20.164449                         & 0.689197 \\
+\multirow{-3}{*}{20-Highway} & \multirow{-3}{*}{3.2 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-1.547543}    & \cellcolor[HTML]{9AFF99}\textbf{+0.667971} & \cellcolor[HTML]{FFCCC9}\textbf{-0.475810} \\ \midrule
+                              &                            & 基线 & 6.917041    & 8.912866                          & 1.581715 \\
+                              &                            & 本文PO-VIO      & 6.457796    & 6.543866                          & 0.972692 \\
+\multirow{-3}{*}{26-Dongtan}   & \multirow{-3}{*}{4.0 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.459245}    & \cellcolor[HTML]{FFCCC9}\textbf{-2.369000}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.609023} \\ \midrule
+                              &                            & 基线 & 5.119043    & 11.795006                         & 0.809538 \\
+                              &                            & 本文PO-VIO      & 4.592121    & 8.789568                          & 0.705091 \\
+\multirow{-3}{*}{28-Pangyo}   & \multirow{-3}{*}{11.47 km} & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.526922}    & \cellcolor[HTML]{FFCCC9}\textbf{-3.005438}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.104447} \\ \bottomrule
+\end{tabular}
+\label{tab:vio_kaist}
+\begin{tablenotes}
+  \item [a] $\Delta$表示本文设计相对于基线的改进变化量
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\linewidth]{kaist_cloud.pdf}
+  \caption{KAIST数据集上$RPE_r$\textdownarrow{}分布示意图}
+  \label{fig:vio_kaist}
+\end{figure}
+
+从表中可以看出，本文设计的PO-VIO在大部分序列上均取得了误差上的改进。对于20-Highway序列，经过改进后，绝对轨迹误差($ATE_t$)从27.55降至26.00，每公里降低约1.55；旋转误差($RPE_r$)也由1.17降低到0.69，减少了约0.48，但相对平移误差($RPE_t$)则略有增加，从19.50上升至20.16。对于26-Dongtan 序列，改进后的$ATE_t$由6.92降至6.46，$RPE_t$从8.91降低到6.54，$RPE_r$也由1.58降低到0.97，三项指标均有明显改善。28-Pangyo序列中，$ATE_t$由5.12降至4.59，$RPE_t$则显著从11.80下降到8.79，而$RPE_r$变化较小，从0.81略降至0.78。
+
+总体来看，尽管20-Highway序列中$RPE_t$有所上升，但本文设计在大部分场景下均能有效降低绝对及相对误差，整体性能得到了提升。
+
+为了展示本文设计的PO-VIO与基线的稳定性效果对比，本文在图~\ref{fig:vio_kaist} 中展示了KAIST数据集上$RPE_r$\textdownarrow{}的分布情况。从图中可以看出，本文的PO-VIO在KAIST数据集上的$RPE_r$\textdownarrow{}分布更加集中，且均值更低，相较于基线有着更好的效果。
+
+\subsection{PO-VIO性能提升的来源分析}
+针对PO-VIO性能提升的原因，本文猜测可能是因为本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
+
+为了验证这一猜想，本文对车身坐标系的速度量进行分析。分析建立在OF2和OF3两条序列上，这两条序列有着比较突出的特点：OF2序列上本文PO-VIO的$RPE_t$和$RPE_r$均有所提升，但是整体幅度较小；OF3序列上本文PO-VIO的$RPE_t$有所下降，但是$RPE_r$有所提升，而且每100米的旋转误差减小了接近1$\degree$/100m。因此选择这两条序列进行分析，能够更好发现本文的速度伪观测约束在何种条件下会对里程计的效果产生积极影响。两条序列上的速度量在车身坐标系的变化如图~\ref{fig:VIO_velocity} 所示。
 
 \begin{figure}
   \centering
@@ -350,52 +402,13 @@ ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.0
 
 此外，观察两个序列下的速度变化，可以发现在OF2上，“VIO+伪观测”的车身横向和垂直速度全过程都有较为平滑的估计结果，相比之下OF3序列上“VIO+伪观测”在最后阶段出现了较明显的起伏，因此其出现了OF3序列上本文方法的$RPE_t$有所下降的现象，而OF2序列上本文方法的$RPE_t$达到同类方法的最优。
 
-\subsubsection{KAIST数据集测试}
 
-KAIST数据集上的测试如表~\ref{tab:vio_kaist} 所示，表中展示了本文设计的视觉惯性里程计在KAIST数据集上的效果对比，对比方法包括Baseline(VINS-Mono)和本文设计的视觉惯性里程计。此外为了方便对比，表中还展示了本文设计相对于Baseline的改进变化量$\Delta$，用红底表示在该指标下进步，绿底表示在该指标下有所退化。在指标方面，此处将常规的$ATE_t$改变为$ATE_t$/km，即每公里的绝对轨迹误差，以更好地反映里程计的精度。
-
-从表中可以看出，本文设计的视觉惯性里程计在大部分序列上均取得了误差上的改进。对于20-Highway序列，经过改进后，绝对轨迹误差($ATE_t$)从27.55降至26.00，每公里降低约1.55；旋转误差($RPE_r$)也由1.17降低到0.69，减少了约0.48，但相对平移误差($RPE_t$)则略有增加，从19.50上升至20.16。对于26-Dongtan 序列，改进后的$ATE_t$由6.92降至6.46，$RPE_t$从8.91降低到6.54，$RPE_r$也由1.58降低到0.97，三项指标均有明显改善。28-Pangyo序列中，$ATE_t$由5.12降至4.59，$RPE_t$则显著从11.80下降到8.79，而$RPE_r$变化较小，从0.81略降至0.78。总体来看，尽管20-Highway序列中$RPE_t$有所上升，但本文设计在大部分场景下均能有效降低视觉惯性里程计的绝对及相对误差，整体性能得到了提升。
+\subsection{消融实验}
+为了探究本文提出的VIO方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括“VIO”、“惯性-车体因子”、“伪观测约束”、“车身状态判别”和“车身状态真值”，其中“VIO”是基础配置，其他变量的加入均是在VIO的基础上进行的；“惯性-车体因子”表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；“伪观测约束”表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；“车身状态判别”表示是否根据车身状态判别神经网络的结果而调整后端优化量；“车身状态真值”表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块。
 
 \begin{table}
 \centering
-\begin{threeparttable}
-\caption{KAIST数据集视觉惯性里程计效果对比}
-\begin{tabular}{lccccc}
-\toprule
-序列                           & 长度                         & 方法         & $ATE_t$/km\textdownarrow{} & $RPE_t$\textdownarrow{}                           & $RPE_r$\textdownarrow{}  \\ \midrule
-                              &                            & Baseline & 27.551458   & 19.496478                         & 1.165007 \\
-                              &                            & 本文VIO      & 26.003915   & 20.164449                         & 0.689197 \\
-\multirow{-3}{*}{20-Highway} & \multirow{-3}{*}{3.2 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-1.547543}    & \cellcolor[HTML]{9AFF99}\textbf{+0.667971} & \cellcolor[HTML]{FFCCC9}\textbf{-0.475810} \\ \midrule
-                              &                            & Baseline & 6.917041    & 8.912866                          & 1.581715 \\
-                              &                            & 本文VIO      & 6.457796    & 6.543866                          & 0.972692 \\
-\multirow{-3}{*}{26-Dongtan}   & \multirow{-3}{*}{4.0 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.459245}    & \cellcolor[HTML]{FFCCC9}\textbf{-2.369000}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.609023} \\ \midrule
-                              &                            & Baseline & 5.119043    & 11.795006                         & 0.809538 \\
-                              &                            & 本文VIO      & 4.592121    & 8.789568                          & 0.705091 \\
-\multirow{-3}{*}{28-Pangyo}   & \multirow{-3}{*}{11.47 km} & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.526922}    & \cellcolor[HTML]{FFCCC9}\textbf{-3.005438}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.104447} \\ \bottomrule
-\end{tabular}
-\label{tab:vio_kaist}
-\begin{tablenotes}
-  \item [a] $\Delta$表示本文设计相对于Baseline的改进变化量
-\end{tablenotes}
-\end{threeparttable}
-\end{table}
-
-为了更好对比本文设计的视觉惯性里程计与Baseline的效果，本文在图~\ref{fig:vio_kaist} 中展示了KAIST数据集上$RPE_r$\textdownarrow{}的分布情况。从图中可以看出，本文设计的视觉惯性里程计在KAIST数据集上的$RPE_r$\textdownarrow{}分布更加集中，且均值更低，相较于Baseline有着更好的效果。
-
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\linewidth]{kaist_cloud.pdf}
-  \caption{KAIST数据集上$RPE_r$\textdownarrow{}分布示意图}
-  \label{fig:vio_kaist}
-\end{figure}
-
-
-\subsection{里程计消融实验}
-为了探究本文提出的视觉惯性里程计方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括“VIO”、“惯性-车体因子”、“伪观测约束”、“车身状态判别”和“车身状态真值”，其中“VIO”是基础配置，在本文中即为VINS-Mono，其他变量的加入均是在VIO的基础上进行的；“惯性-车体因子”表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；“伪观测约束”表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；“车身状态判别”表示是否根据车身状态判别神经网络的结果而调整后端优化量；“车身状态真值”表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块。
-
-\begin{table}
-\centering
-\caption{视觉惯性里程计消融实验}
+\caption{PO-VIO消融实验}
 \begin{tabular}{cccccccc}
 \toprule
 VIO        & \begin{tabular}[c]{@{}c@{}}惯性-车体\\ 因子\end{tabular} & \begin{tabular}[c]{@{}c@{}}伪观测\\ 约束\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 判别\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 真值\end{tabular} & $ATE_t$\textdownarrow{}       & $RPE_t$\textdownarrow{}     & $RPE_r$\textdownarrow{}      \\ \midrule
@@ -416,11 +429,21 @@ $\checkmark$           &                          & $\checkmark$             &  
 
 表中最后一行在第四行的基础上去掉了惯性车体因子，即在优化过程中不优化惯性-车体因子，而仅使用初始量。这一行相较于第四行的结果是：$ATE_t$和$RPE_r$产生了一定程度的损失，但是$RPE_t$却达到了最好效果。这一行的结果表明：惯性-车体因子的实时优化对于绝对位置精度和旋转估计有着重要的积极影响，但是对于相对平移估计则有着负面影响。但是综合来看，优化惯性-车体因子对于绝对位置和相对旋转的估计的提升明显，而对于相对位置估计精度的影响有限，因此有保留的必要。
 
-\section{紧耦合地图定位模块测试}
-紧耦合地图定位模块的测试在KITTI数据集和4Seasons数据集上进行，本节将分别对两个数据集上的测试结果进行展示。其中KITTI数据集上的测试使用模拟的多趟行驶数据，即彩色相机图像建图，灰度图像定位的模式，建图场景和测试场景的变化较小；而4Seasons数据集上的测试使用真实的多趟行驶数据，定位和建图的场景变化较大，具有较强的挑战性。
+\section{地图定位模块测试}
+地图定位模块的测试在KITTI数据集和4Seasons数据集上进行，本节将分别对两个数据集上的测试结果进行展示。其中KITTI数据集上的测试使用模拟的多趟行驶数据，建图场景和测试场景的变化较小；而4Seasons数据集上的测试使用真实的多趟行驶数据，定位和建图的场景变化较大，具有较强的挑战性。
 
-\subsection{KITTI数据集测试}
-紧耦合地图定位模块的测试在两个数据集上进行，分别是KITTI数据集和4Seasons数据集。在KITTI数据集上，本文的紧耦合地图定位模块和VINS-Fusion、VINS-Fusion-Map、ORB-SLAM3和ORB—SLAM3-Map进行对比，其中VINS-Fusion-Map和ORB—SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。测试结果如表~\ref{tab:loc_kitti} 和图~\ref{fig:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
+\subsection{精度测试}
+\subsubsection{KITTI数据集测试}
+在KITTI数据集上，本文的地图定位模块测试结果如图~\ref{fig:loc_kitti} 和表~\ref{tab:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\linewidth]{loc_kitti.pdf}
+  \caption{KITTI数据集测试轨迹示意图}
+  \label{fig:loc_kitti}
+\end{figure}
+
+对比的方法包括VINS-Fusion(VINS)、VINS-Fusion-Map(VINSM)、ORB-SLAM3(ORB)和ORB-SLAM3-Map(ORBM)进行对比，其中VINS-Fusion-Map和ORB-SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。
 
 \begin{table}
 \centering
@@ -461,28 +484,9 @@ VINSM &                       & 0.73          & 0.48          & 0.56          & 
 
 综合来看，本文方法在大部分场景下均能保持较高的翻译精度，并在旋转估计上具有竞争力，这表明所提出的算法具有较好的鲁棒性和适应性。
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\linewidth]{loc_kitti.pdf}
-  \caption{KITTI数据集测试轨迹示意图}
-  \label{fig:loc_kitti}
-\end{figure}
 
-\subsection{4Seasons数据集测试}
-\subsubsection{Office Loop场景测试}
+\subsubsection{综合(Office Loop)场景测试}
 4Seasons数据集实在同一条线路上多次采集获得的，采集的时间跨度从几十分钟到一年，所以其场景相对于KITTI数据集有更多的变化，包括季节、天气、晨昏等。本文首先在Office Loop的一般性场景下进行测试。一般性场景测时的建图序列为2020.03.24 17:36拍摄，而定位序列为2020.03.24 17:45拍摄，两个场景差异较小，因此可以同时比较多个方法的表现。
-
-测试结果如表~\ref{tab:loc_4seasons_of2} 所示，其中包括了VINS-Mono、VINS-Fusion w/ RTK、ORB-SLAM3、VLS\cite{yang2022real}(2022)、GPLD\cite{hao2023global}(2023)、MVIL\cite{zhang2023map}(2023)等方法与本文方法的对比，其中VINS-Fusion w/ RTK使用了高精度(厘米级)GNSS信号，而VLS、GPLD、MVIL则是近期涌现的三种基于地图的定位方法。
-
-\begin{figure}
-  \centering
-  \subcaptionbox{OF1序列建图轨迹\label{fig:loc_4seasons_of1}}{\includegraphics[width=0.47\linewidth]{OF1_zoomin.pdf}}
-  \subcaptionbox{OF2序列定位轨迹\label{fig:loc_4seasons_of2}}{\includegraphics[width=0.45\linewidth]{OF2_zoomin.pdf}}
-  \caption{4Seasons数据集定位结果及误差分析}
-  \label{fig:loc_gnssmap}
-\end{figure}
-
-首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比。从表~\ref{tab:loc_4seasons_of2} 中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_4seasons_of2} 所示。
 
 \begin{table}
 \centering
@@ -513,6 +517,20 @@ MVIL                                   &                                        
 \end{threeparttable}
 \end{table}
 
+测试结果如表~\ref{tab:loc_4seasons_of2} 所示，其中包括了VINS-Mono、VINS-Fusion w/ RTK、ORB-SLAM3、VLS\cite{yang2022real}(2022)、GPLD\cite{hao2023global}(2023)、MVIL\cite{zhang2023map}(2023)等方法与本文方法的对比，其中VINS-Fusion w/ RTK使用了高精度(厘米级)GNSS信号，而VLS、GPLD、MVIL则是近期涌现的三种基于地图的定位方法。
+
+首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比。从表~\ref{tab:loc_4seasons_of2} 中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_4seasons_of2} 所示。
+
+\begin{figure}
+  \centering
+  \subcaptionbox{OF1序列建图轨迹\label{fig:loc_4seasons_of1}}{\includegraphics[width=0.47\linewidth]{OF1_zoomin.pdf}}
+  \subcaptionbox{OF2序列定位轨迹\label{fig:loc_4seasons_of2}}{\includegraphics[width=0.45\linewidth]{OF2_zoomin.pdf}}
+  \caption{4Seasons数据集定位结果及误差分析}
+  \label{fig:loc_gnssmap}
+\end{figure}
+
+在图~\ref{fig:loc_4seasons_of2} 中可以看到在放大区域有着明显的定位误差，但这并非由于定位方法引入，而是由建图误差引入：如图~\ref{fig:loc_4seasons_of1} 所示，可以看到在定位误差较大的区域，建图时本身就存在明显的偏差，这导致了定位过程中引入了这一误差。因此，本文的定位方法在4Seasons数据集上的表现是受到了建图质量的影响，但是相较于其他方法，本文的定位方法在相同的建图条件下取得了更好的定位精度。
+
 \begin{figure}
   \centering
   \includegraphics[width=0.1\linewidth]{white.png}
@@ -528,15 +546,7 @@ MVIL                                   &                                        
   \label{fig:scene_of}
 \end{figure}
 
-在图~\ref{fig:loc_4seasons_of2} 中可以看到在放大区域有着明显的定位误差，但这并非由于定位方法引入，而是由建图误差引入：如图~\ref{fig:loc_4seasons_of1} 所示，可以看到在定位误差较大的区域，建图时本身就存在明显的偏差，这导致了定位过程中引入了这一误差。因此，本文的定位方法在4Seasons数据集上的表现是受到了建图质量的影响，但是相较于其他方法，本文的定位方法在相同的建图条件下取得了更好的定位精度。
-
 在Office Loop的环境下还有更多的具有挑战性的序列，本文在这些序列上也进行了测试。这些序列包括了OF3、OF4和OF5，具体的场景变化如图~\ref{fig:scene_of} 所示，这些序列的场景相较于OF2，有了晨昏~\ref{fig:scene_of3}，季节~\ref{fig:scene_of4}和~\ref{fig:scene_of5}，天气~\ref{fig:scene_of5} 的变化。定位的结果如表~\ref{tab:loc_4seasons_of345} 所示，需要说明的是，由于从OF3开始场景出现了较大的变化，因此一些使用传统方法的地图定位方法无法再依靠地图信息运行，因此此处仅汇报了可以运行的方法。
-
-具体分析此场景下的不同序列可以看出，OF3和OF1两个序列的分别是在下午和清晨拍摄，所以图片中的光照强度首先就有一定的不同，此外图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of3}中道路的车况也有一定区别，在图~\ref{fig:scene_of3} 中出现了建图过程未出现的车辆，为定位的细粒度特征匹配增加了较大困难。OF4和OF1两个序列存在季节的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of4} 中可以看到，OF4中的场景中出现了更繁茂的植被，甚至遮盖了部分建筑物，这对于细粒度特征匹配和定位都带来了一定的困难。OF5和OF1两个序列存在天气的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of5} 中可以看到，OF5中的场景中出现了降雪，改变了整个场景的整体感知条件，这对于定位的粗粒度和细粒度匹配都带来的挑战。
-
-从表中信息可以看出：本文方法在所有序列的$ATE_t$和$RPE_t$指标上均取得了明显的优势，是所有方法中唯一误差稳定在1米以内的方法；在OF5上的$RPE_r$指标上略逊于VLS方法，但是差距极小。
-
-在表~\ref{tab:loc_4seasons_of2} 和表~\ref{tab:loc_4seasons_of345} 中还可以发现本文方法在地图本身具有误差的情况下，定位结果却出现了部分超越地图精度的情况。这一现象结合后文的消融实验可以看到本文将地图建模为概率地图的做法具有一定作用：在地图中引入了不确定性后，紧耦合优化可以更好地利用地图信息，从而提升定位精度。
 
 \begin{table}
 \centering
@@ -564,22 +574,17 @@ VLS                &                                                            
 \label{tab:loc_4seasons_of345}
 \end{table}
 
-\subsubsection{Neighborhood场景测试}
+具体分析此场景下的不同序列可以看出，OF3和OF1两个序列的分别是在下午和清晨拍摄，所以图片中的光照强度首先就有一定的不同，此外图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of3}中道路的车况也有一定区别，在图~\ref{fig:scene_of3} 中出现了建图过程未出现的车辆，为定位的细粒度特征匹配增加了较大困难。OF4和OF1两个序列存在季节的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of4} 中可以看到，OF4中的场景中出现了更繁茂的植被，甚至遮盖了部分建筑物，这对于细粒度特征匹配和定位都带来了一定的困难。OF5和OF1两个序列存在天气的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of5} 中可以看到，OF5中的场景中出现了降雪，改变了整个场景的整体感知条件，这对于定位的粗粒度和细粒度匹配都带来的挑战。
 
-Neighborhood场景中有更多的植被，接近于农村环境，因此在这个场景下的测试能表现出本文方法在较低纹理环境下的表现。在此场景下又增加了几种Office Loop场景中没有出现的条件，例如降雨天气(NH3)和傍晚环境(NH7)。两种情况如图~\ref{fig:scene_nh} 所示，左图的降雨条件可以看到明显的水雾出现在图像上，而右图的傍晚环境，可以看到明显的亮度降低。
+从表中信息可以看出：本文方法在所有序列的$ATE_t$和$RPE_t$指标上均取得了明显的优势，是所有方法中唯一误差稳定在1米以内的方法；在OF5上的$RPE_r$指标上略逊于VLS方法，但是差距极小。
 
-\begin{figure}
-  \centering
-  \subcaptionbox*{NH3序列降雨场景\label{fig:scene_nh3}}{\includegraphics[width=0.32\linewidth]{Neighborhood3.png}}
-  \subcaptionbox*{NH7序列傍晚场景\label{fig:scene_nh7}}{\includegraphics[width=0.32\linewidth]{Neighborhood7.png}}
-  \caption{4Seasons数据集NH3与NH7场景差异展示}
-  \label{fig:scene_nh}
-\end{figure}
+在表~\ref{tab:loc_4seasons_of2} 和表~\ref{tab:loc_4seasons_of345} 中还可以发现本文方法在地图本身具有误差的情况下，定位结果却出现了部分超越地图精度的情况。这一现象结合后文的消融实验可以看到本文将地图建模为概率地图的做法具有一定作用：在地图中引入了不确定性后，紧耦合优化可以更好地利用地图信息，从而提升定位精度。
 
 
-测试结果如表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47}所示，其中本文方法在所有序列的$ATE_t$和$RPE_t$指标上取得了最好的效果，但是在$RPE_r$依旧没有比其他方法有明显优势，但是所有方法在该指标上的差距都非常小。
+\subsubsection{低结构化(Neighborhood)场景测试}
 
-在此场景下由于离线建图的精度较高，因此本文方法在定位过程中能够更好地利用地图信息，从而提升定位精度，$ATE_t$指标下都获得了30厘米左右的误差，已经达到了厘米级的定位精度。但是此场景下，本文定位方法并没有出现超越地图精度的情况，这主要是受限于本文定位方法的精度上限，这一上限也将在后文的消融实验中进行验证。
+
+Neighborhood场景中有更多的植被，接近于农村环境，因此在这个场景下的测试能表现出本文方法在较低纹理环境下的表现。在此场景下又增加了几种Office Loop场景中没有出现的条件，例如降雨天气(NH3)和傍晚环境(NH7)。测试结果如表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47}所示。
 
 \begin{table}
 \centering
@@ -600,6 +605,18 @@ VLS                &                                                            
 \label{tab:loc_4seasons_nh23}
 \end{table}
 
+降雨条件和傍晚条件的感知条件如图~\ref{fig:scene_nh} 所示，左图的降雨条件可以看到明显的水雾出现在图像上，而右图的傍晚环境，可以看到明显的亮度降低。在这种条件下本文方法依旧在所有序列的$ATE_t$和$RPE_t$指标上取得了最好的效果；虽然在$RPE_r$依旧没有比其他方法有明显优势，但是所有方法在该指标上的差距都非常小，更进一步展示了本文方法对环境的适应性。
+
+\begin{figure}
+  \centering
+  \subcaptionbox*{NH3序列降雨场景\label{fig:scene_nh3}}{\includegraphics[width=0.32\linewidth]{Neighborhood3.png}}
+  \subcaptionbox*{NH7序列傍晚场景\label{fig:scene_nh7}}{\includegraphics[width=0.32\linewidth]{Neighborhood7.png}}
+  \caption{4Seasons数据集NH3与NH7场景差异展示}
+  \label{fig:scene_nh}
+\end{figure}
+
+在此场景下由于离线建图的精度较高，因此本文方法在定位过程中能够更好地利用地图信息，从而提升定位精度，$ATE_t$指标下都获得了30厘米左右的误差，已经达到了厘米级的定位精度。但是此场景下，本文定位方法并没有出现超越地图精度的情况，这主要是受限于本文定位方法的精度上限，这一上限也将在后文的消融实验中进行验证。
+
 \begin{table}
 \centering
 \caption{4Seasons数据集Neighborhood场景第4与第7序列指标对比}
@@ -619,23 +636,24 @@ VLS                &                                                            
 \label{tab:loc_4seasons_nh47}
 \end{table}
 
-由于NH5和NH6所代表的场景已经出现在了表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47} 中，因此不再重复描述其具体数值，而是以$APE_t$的云雨图~\ref{fig:loc_4seaons_nh5} 和图~\ref{fig:loc_4seaons_nh6} 形式展示不同方法的定位结果。云雨图图中展示了不同方法在NH5和NH6两个序列上的定位误差分布，三条横线由高到低分别表示“最大值”，“中位数”和“最小值”，可以看到本文方法在这两个序列上的定位误差分布更加集中，且中位数更低，这说明本文方法在这两个序列上的定位精度更高且更稳定。
+由于NH5和NH6所代表的场景已经出现在了表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47} 中，因此不再重复描述其具体数值，而是以$APE_t$的云雨图~\ref{fig:loc_4seaons_nh5} 形式展示不同方法的定位结果。云雨图图中展示了不同方法在NH5和NH6两个序列上的定位误差分布，三条横线由高到低分别表示“最大值”，“中位数”和“最小值”，可以看到本文方法在这两个序列上的定位误差分布更加集中，且中位数更低，这说明本文方法在这两个序列上的定位精度更高且更稳定。
 
 \begin{figure}
   \centering
-  \includegraphics[width=1.0\linewidth]{loc_NH5_cloud.png}
-  \caption{不同定位方法在OF5序列上的定位误差分布}
+  \includegraphics[width=0.8\linewidth]{loc_NH5_cloud.png}
+  \includegraphics[width=0.8\linewidth]{loc_NH6_cloud.png}
+  \caption{不同定位方法在OF5(上)和OF6(下)序列上的定位误差分布}
   \label{fig:loc_4seaons_nh5}
 \end{figure}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\linewidth]{loc_NH6_cloud.png}
-  \caption{不同定位方法在OF6序列上的定位误差分布}
-  \label{fig:loc_4seaons_nh6}
-\end{figure}
+% \begin{figure}
+%   \centering
+%   \includegraphics[width=1.0\linewidth]{loc_NH6_cloud.png}
+%   \caption{不同定位方法在OF6序列上的定位误差分布}
+%   \label{fig:loc_4seaons_nh6}
+% \end{figure}
 
-\subsubsection{Business Campus与Old Town场景测试}
+\subsubsection{复杂(Business Campus与Old Town)场景测试}
 
 Business Campus场景在校园环境中，Old Town场景在城市中心区，这两个场景的有着更多的建筑物和道路，但也有着更多的移动物体和复杂的动态场景，如图~\ref{fig:scene_bc2} 和图~\ref{fig:scene_ot2} 所示，因此在这个场景下的测试能够更好地表现出本文方法在复杂环境下的表现。此外，在场景感知条件变化方面，这两个场景也覆盖了多种季节和天气条件，在Old Twon的建图序列中还有降雨天气，如图~\ref{fig:scene_ot1} 所示，也可以反映出本文方法在较差天气建图条件下的定位表现。
 
@@ -690,7 +708,7 @@ VLS                &                                                            
 
 \subsection{消融实验}
 
-为了验证紧耦合地图定位中的各个模块对定位精度的影响，本文进行了一系列的消融实验。在这些实验中，本文逐步增加紧耦合地图定位中的各个模块，从而验证了这些模块对定位精度的影响。具体实验结果如表~\ref{tab:loc_ablation} 所示，表中主要研究了“VIO”、“粗到细定位”、“转换矩阵更新”、“相邻帧边”、“地图关键帧边”、“地图观测边”、“地图点先验边”和“真值地图”这8个变量对紧耦合地图定位的影响，实验设置在Office Loop的第3条序列(OF3)上，以$ATE_t$为主要报告指标。
+为了验证地图定位中的各个模块对定位精度的影响，本文进行了一系列的消融实验。在这些实验中，本文逐步增加地图定位中的各个子模块，从而验证了这些模块对定位精度的影响。具体实验结果如表~\ref{tab:loc_ablation} 所示，表中主要研究了“PO-VIO”、“粗到细定位”、“转换矩阵更新”、“相邻帧边”、“地图关键帧边”、“地图观测边”、“地图点先验边”和“真值地图”这8个变量对地图定位的影响，实验设置在Office Loop的第3条序列(OF3)上，以$ATE_t$为主要报告指标。
 
 \begin{table}
 \centering
@@ -698,7 +716,7 @@ VLS                &                                                            
 \caption{消融实验结果对比}
 \begin{tabular}{ccccccccc}
 \toprule
-VIO          & \begin{tabular}[c]{@{}c@{}}粗到细\\ 定位\end{tabular} & \begin{tabular}[c]{@{}c@{}}转换矩阵\\ 更新\end{tabular} & \begin{tabular}[c]{@{}c@{}}相邻帧\\ 边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 关键帧边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 观测边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图点\\ 先验边\end{tabular} & \begin{tabular}[c]{@{}c@{}}真值 \\ 地图 \end{tabular} & $ATE_t$    \\ \midrule
+PO-VIO          & \begin{tabular}[c]{@{}c@{}}粗到细\\ 定位\end{tabular} & \begin{tabular}[c]{@{}c@{}}转换矩阵\\ 更新\end{tabular} & \begin{tabular}[c]{@{}c@{}}相邻帧\\ 边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 关键帧边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 观测边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图点\\ 先验边\end{tabular} & \begin{tabular}[c]{@{}c@{}}真值 \\ 地图 \end{tabular} & $ATE_t$    \\ \midrule
 $\checkmark$ &                                                  &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 17.193425      \\
               & $\checkmark$                                     &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & \textgreater{}60     \\
 $\checkmark$ & $\checkmark$                                     &                                                  &                                                 &                                                   &                                                  &                                                   &                                                 & \underline{6.987066} \\
@@ -717,12 +735,32 @@ $\checkmark$ & $\checkmark$                                     &$\checkmark$   
 \end{threeparttable}
 \end{table}
 
-在表~\ref{tab:loc_ablation} 中只有“粗到细定位”时产生了较大的定位误差，这是因为在VIO和转换矩阵为粗到细定位提供先验位置信息的时候，粗到细定位的粗定位仅使用粗粒度特征产生了误匹配，从而将整个定位误差增长到了一个难以接受的程度。在第三行，当使用了VIO和转换矩阵后，这一定位误差极大得缩小到了一个可以接受的程度，这说明本文使用的转换矩阵具有非常重要的作用。但是在仅有转换矩阵而不维护的情况下，在序列的后段，由于VIO的累积误差越来越大，使得转换矩阵不再能准确反映当前VIO结果和全局坐标系的正确关系，此时粗到细定位的先验位置信息也失去了意义，所以定位失败，因此表中的数据以下划线表示其是不完整序列的定位数据。在加入了转换矩阵更新之后，估计不完整的问题得到了解决，定位精度得到了进一步的提升。
+在表~\ref{tab:loc_ablation} 中只有“粗到细定位”时产生了较大的定位误差，这是因为在PO-VIO和转换矩阵为粗到细定位提供先验位置信息的时候，粗到细定位的粗定位仅使用粗粒度特征产生了误匹配，从而将整个定位误差增长到了一个难以接受的程度。在第三行，当使用了VIO和转换矩阵后，这一定位误差极大得缩小到了一个可以接受的程度，这说明本文使用的转换矩阵具有非常重要的作用。但是在仅有转换矩阵而不维护的情况下，在序列的后段，由于PO-VIO的累积误差越来越大，使得转换矩阵不再能准确反映当前VIO结果和全局坐标系的正确关系，此时粗到细定位的先验位置信息也失去了意义，所以定位失败，因此表中的数据以下划线表示其是不完整序列的定位数据。在加入了转换矩阵更新之后，估计不完整的问题得到了解决，定位精度得到了进一步的提升。
 
 在第四行到第七行中，逐步加入了相邻帧边、地图关键帧边、地图观测边和地图点先验边，可以看到这些边的加入都使得定位精度得到了进一步的提升，这说明这些边对于定位精度的提升都是有益的。这表明本文所提出的紧耦合优化中的各个残差边都是对定位结果有正向作用的。
 
 在最后一行中，加入了真值地图，可以看到定位精度得到了进一步的提升，这说明真值地图对于定位精度的提升是有益的。在使用了真值地图后，定位精度达到了30厘米左右，这可以看作是本文方法的定位精度上限，而这也与4Seasons数据集中实验情况相符：在建图精度不足的情况下，本文方法的精度上限受到地图精度的限制(例如Office Loop场景和Old Town场景)，但是在建图精度较高的情况下，本文方法的定位精度上限只由紧耦合地图定位模块的精度决定(例如Neighborhood场景和Business Campus场景)。
 
+\subsection{系统效率测试}
+
+\begin{table}
+\centering
+\caption{本文地图定位模块运行时间测试}
+\begin{threeparttable}
+\begin{tabular}{lccccccc}
+  \toprule
+  实现方法     & \begin{tabular}[c]{@{}c@{}}粗特征\\ 提取$^{\dagger}$\end{tabular} & \begin{tabular}[c]{@{}c@{}}粗特征\\ 匹配\end{tabular} & \begin{tabular}[c]{@{}c@{}}细特征\\ 提取+匹配$^{\dagger}$\end{tabular} & \begin{tabular}[c]{@{}c@{}}概率投票\\ 定位\end{tabular} & 优化                   & 其他                   & 总计    \\ \midrule
+  TensorRT & 9.0                                              & \multirow{2}{*}{0.4}                             & 4.2+20.1                                            & \multirow{2}{*}{3.5}                              & \multirow{2}{*}{1.4} & \multirow{2}{*}{0.1} & 38.7  \\
+  PyTorch  & 22.2                                             &                                                  & 59.8+242.6                                          &                                                   &                      &                      & 330.0 \\ \bottomrule
+  \end{tabular}
+\label{tab:efficiency}
+\begin{tablenotes}
+  \item [a] 时间单位为毫秒(ms)
+  \item [b] ${\dagger}$表示此过程使用神经网络类方法
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
 \section{本章总结}
 
-本章主要以实验验证的方式对本文所提出的固定路线定位方法进行了评估。首先，本章对实验实施的平台进行了介绍，包括实验所使用的数据集、实验所使用的硬件平台和软件平台以及实验的评估指标包括绝对轨迹误差和相对姿态误差。然后本章分别针对3个子模块的性能进行了测试，并与一些常规方法进行对比，分析了本文方法的优势所在以及不足之处，在重要模块中还增加了消融实验来详细验证模块内组成部分对整体精度的影响。最后，本章对实验结果进行了总结，验证了本文方法的有效性和鲁棒性。
+本章主要以实验验证的方式对本文所提出的固定路线定位方法进行了评估。首先，本章对实验实施的平台进行了介绍，包括实验所使用的数据集、实验所使用的硬件平台和软件平台以及实验的评估指标包括绝对轨迹误差和相对姿态误差。然后本章分别针对3个模块的性能进行了测试，并与一些常规方法进行对比，分析了本文方法的优势所在以及不足之处，在重要模块中还增加了消融实验来详细验证模块内组成部分对整体精度的影响。最后，本章对实验结果进行了总结，验证了本文方法的有效性和鲁棒性。
