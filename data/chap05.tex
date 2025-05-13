@@ -5,35 +5,36 @@
 
 \chapter{视觉惯性定位系统搭建与测试}
 
-本章主要对定位系统的搭建即实施进行介绍。首先介绍了定位系统运行所依靠的硬件平台以及软件环境，不同于一般的定位系统，本文方法的实施依赖于深度学习及图形处理单元(Graphics processing unit, GPU)。然后介绍了本文所使用的数据集以及评价指标，本文实验主要建立在3个数据集上，分别是KITTI数据集、4Seasons数据集和KAIST数据集，其中KITTI数据集场景相对单一，适合验证离线建图模块的性能，以及初步验证定位模块的性能；4Seasons数据集提供的场景丰富，适合验证VIO和紧耦合地图定位模块的性能；KAIST数据集提供了超长轨迹，适合验证VIO模块的性能。最后本章介绍了定位系统三个模块的测试结果，并通过相应的消融实验来验证各部分的真实作用。
+本章主要对定位系统的搭建与测试进行介绍。首先介绍了定位系统运行所依靠的硬件平台以及软件环境：不同于一般的定位系统，本文方法的实施依赖于深度学习及图形处理单元（Graphics processing unit, GPU）。然后介绍了本章所使用的数据集以及评价指标。本章实验主要建立在3个数据集上：KITTI数据集、4Seasons数据集和KAIST数据集。其中KITTI数据集场景相对单一，适合验证离线建图模块的性能，以及初步验证定位模块的性能；4Seasons数据集提供的场景丰富，适合验证VIO和紧耦合地图定位模块的性能；KAIST数据集提供了超长轨迹，适合验证VIO模块的性能。最后本章介绍了定位系统三个模块的测试结果，并通过相应的消融实验和效率测试来验证各部分的真实作用和可行性。
 
 \section{系统与测试细节}
 \subsection{硬件与软件环境}
 
-本文所设计的定位系统的运行环境依赖于同时具有CPU(Central processing unit)和GPU(Graphics processing unit)的计算机，具体来说本文所实验的平台使用12th Gen Intel(R) Core(TM) i7-12700 CPU和NVIDIA GeForce RTX 3080 GPU。
+本文所设计的定位系统的运行环境依赖于同时具有CPU（Central Processing Unit）和GPU（Graphics Processing Unit）的计算机，具体来说本文的实验平台使用12th Gen Intel Core i7-12700 CPU和NVIDIA GeForce RTX 3080 GPU。
+
+系统的软件部署环境如图~\ref{fig:software} 所示，其中Ubuntu 20.04 LTS是本章所使用的操作系统；ROS Noetic是本章所使用的机器人操作系统，其主要作用是将多个子系统的结果方便快捷地统一处理；VINS-Mono是本章所使用的视觉惯性定位系统的基线，其具有较为简洁的逻辑划分，方便快速改进、验证想法；TensorRT是本章所使用的深度学习推理框架，其主要负责系统中的神经网络推理任务，其针对NVIDIA显卡的速度优化使得整个系统可以实时运行。此外，本文所设计系统中还有大量超参数，其具体取值如表~\ref{tab:hyperparameters} 所示。
 
 \begin{figure}
   \centering
-  \subcaptionbox*{Ubuntu 20.04 LTS}{\includegraphics[width=0.22\linewidth]{ubuntu_logo.png}}
-  \subcaptionbox*{ROS Noetic}{\includegraphics[width=0.18\linewidth]{noetic_logo.png}}
-  \subcaptionbox*{VINS-Mono}{\includegraphics[width=0.22\linewidth]{VINS_logo.jpeg}}
-  \subcaptionbox*{TensorRT}{\includegraphics[width=0.3\linewidth]{tensorrt_logo.png}}
+  \subcaptionbox{Ubuntu 20.04}{\includegraphics[width=0.22\linewidth]{ubuntu_logo.png}}
+  \subcaptionbox{ROS Noetic}{\includegraphics[width=0.18\linewidth]{noetic_logo.png}}
+  \subcaptionbox{VINS-Mono}{\includegraphics[width=0.22\linewidth]{VINS_logo.jpeg}}
+  \subcaptionbox{TensorRT}{\includegraphics[width=0.3\linewidth]{tensorrt_logo.png}}
   \caption{软件部署环境}
   \label{fig:software}
 \end{figure}
 
-系统的软件部署环境如图~\ref{fig:software} 所示，其中Ubuntu 20.04 LTS是本文所使用的操作系统；ROS Noetic是本文所使用的机器人操作系统，其主要作用是将多个子系统的结果方便快捷地统一处理；VINS-Mono是本文所使用的视觉惯性定位系统的基线，其具有较为简洁的逻辑划分，方便快速改进、验证想法；TensorRT是本文所使用的深度学习推理框架，其主要负责系统中的神经网络推理任务，其针对NVIDIA显卡的速度优化使得整个系统可以实时运行。此外，本文所设计系统中还有大量超参数，其具体取值如表~\ref{tab:hyperparameters} 所示。
-
 \begin{table}
 \centering
-\caption{本文中所涉及的运行超参数}
+\caption{实验中所涉及的本文系统运行超参数}
+\setlength{\tabcolsep}{6mm}{
 \begin{tabular}{lccc}
 \toprule
 参数名 & 首次出现章节 & 作用 & 取值 \\
 \midrule
 $t_l$ & \ref{sec:map_sfm} & SfM中回环检测相似度阈值 & 0.8 \\
 $m$ & \ref{sec:map_sfm} & SfM中回环帧数量 & 5 \\
-$\alpha$ &  \ref{sec:map_fusion}  & 建图融合权重系数     & 1000 \\
+$\alpha$ &  \ref{sec:map_fusion}  & 建图融合GNSS观测权重系数     & 1000 \\
 $\tau$ & \ref{sec:network_design} & 车辆状态正例预测阈值 & 0.9 \\
 $N_c$ & \ref{sec:loc_vote}  & 粗到细匹配候选关键帧数量 & 7   \\
 $t_r$ &  \ref{sec:loc_vote}  & 投票过程相对旋转角度阈值 & $15\degree$   \\
@@ -43,95 +44,96 @@ $\lambda_p$ &  \ref{sec:valid}  & 有效性验证位移阈值    & 15m   \\
 $N$ &  \ref{sec:loc_pg}  & 滑动窗口容量       & 20   \\
 $\kappa$ &  \ref{sec:loc_pg}  & 单帧图像所考虑的点云比例 & 10  \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \label{tab:hyperparameters}
 \end{table}
 
 \subsection{测试数据集与评价指标}
 \subsubsection{KITTI数据集}
-KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎且使用广泛的数据集之一，它包含大量的多种传感器采集的交通场景数据，包括高分辨率RGB双目相机图像、灰度双目相机图像以及3D激光雷达数据。该数据集提供了11条经过精心选择的序列，构成视觉里程计基准。每条序列包含来自四个相机的数据：两个灰度相机和两个彩色相机。此外，KITTI 数据集还为这11条视觉里程计基准序列中的10条提供了原始GNSS观测数据和IMU测量数据。
+KITTI 数据集\cite{Geiger2012CVPR}是SLAM和自动驾驶研究中最受欢迎且使用广泛的数据集之一，它包含大量的多种传感器采集的交通场景数据，如图~\ref{fig:kitti_data} 展示，包括高分辨率RGB双目相机图像、灰度双目相机图像以及3D激光雷达数据。该数据集提供了11条经过精心选择的序列，构成视觉里程计基准。每条序列包含来自四个相机的数据：两个灰度相机和两个彩色相机。此外，KITTI 数据集还为这11条视觉里程计基准序列中的10条提供了原始GNSS观测数据和IMU测量数据。
 
 \begin{figure}
   \centering
-  \subcaptionbox*{序列00-城镇环境}{\includegraphics[width=0.47\linewidth]{kitti_00.png}}
-  \subcaptionbox*{序列01-高架环境}{\includegraphics[width=0.47\linewidth]{kitti_01.png}}
-  \subcaptionbox*{序列09-郊外环境}{\includegraphics[width=0.47\linewidth]{kitti_09.png}}
-  \subcaptionbox*{序列10-农村环境}{\includegraphics[width=0.47\linewidth]{kitti_10.png}}
+  \subcaptionbox{序列00-城镇环境}{\includegraphics[width=0.47\linewidth]{kitti_00.png}}
+  \subcaptionbox{序列01-高架环境}{\includegraphics[width=0.47\linewidth]{kitti_01.png}}
+  \subcaptionbox{序列09-郊外环境}{\includegraphics[width=0.47\linewidth]{kitti_09.png}}
+  \subcaptionbox{序列10-农村环境}{\includegraphics[width=0.47\linewidth]{kitti_10.png}}
   \caption{KITTI数据集场景}
   \label{fig:kitti_data}
 \end{figure}
 
-本文使用KITTI视觉里程计基准中包含GNSS观测数据的10条序列，评估本文所提出系统的建图性能以及整体性能。这10条序列包括了城镇、高架、郊外以及农村等常见的车辆行驶环境，如图~\ref{fig:kitti_data} 所示。
+本章使用KITTI视觉里程计基准中包含GNSS观测数据的10条序列，评估本章所提出系统的建图性能以及整体性能。这10条序列包括了城镇、高架、郊外以及农村等常见的车辆行驶环境。
 
 \subsubsection{4Seasons数据集}
 4Seasons数据集\cite{wenzel20214seasons}是一个专为自动驾驶研究设计的数据集，提供了涵盖季节变化和复杂感知条件的图像、IMU等数据。同一路径在不同季节和多种感知条件下被多次采集，使其特别适合于评估针对固定路径设计的方法。该数据集使用的传感器包括立体相机、IMU和RTK-GNSS，同时还提供了精度达到厘米级的高精度真值位姿。
 
-与KITTI数据集相比，4Seasons数据集能够提供更具挑战性和说服力的实验结果，突出了本文方法的优势。本文选择了四个具有代表性的场景，分别是
+与KITTI数据集相比，4Seasons数据集能够提供更具挑战性和说服力的实验结果，突出了本文方法的优势。本章选择了四个具有代表性的场景，分别是
 
-\textbf{(1)Office Loop (OF):} 位于城郊工业区的环形路线，长度约为3776米，包含了多种感知条件，如建筑物、树木和道路标志等，如图~\ref{fig:OF_data} 所示。此路线在不同季节采集了5条序列(以OF1-5代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{（1）Office Loop（OF）:} 位于城郊工业区的环形路线，长度约为3776米，包含了多种感知条件，如建筑物、树木和道路标志等，如图~\ref{fig:OF_data} 所示。此路线在不同季节采集了5条序列（以OF1-5代称），每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 \begin{figure}
   \centering
-  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{OfficeLoop.png}}
-  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OF1.png}}
+  \subcaptionbox{场景感知条件}{\includegraphics[width=0.48\linewidth]{OfficeLoop.png}}
+  \subcaptionbox{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OF1.png}}
   \caption{Office Loop场景}
   \label{fig:OF_data}
 \end{figure}
 
-\textbf{(2) Neighborhood (NH):} 位于城镇环境的环形路线，长度约为2106米,包含了多种感知条件，如树木和房屋等，包含了更多的植被，接近于农村环境，如图~\ref{fig:NH_data} 所示。此路线在不同季节采集了7条序列(以NH1-7代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{（2） Neighborhood（NH）:} 位于城镇环境的环形路线，长度约为2106米,包含了多种感知条件，如树木和房屋等，包含了更多的植被，接近于农村环境，如图~\ref{fig:NH_data} 所示。此路线在不同季节采集了7条序列（以NH1-7代称），每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
-  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{Neighborhood.png}}
-  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_NH01.png}}
+  \subcaptionbox{场景感知条件}{\includegraphics[width=0.48\linewidth]{Neighborhood.png}}
+  \subcaptionbox{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_NH01.png}}
   \caption{Neighborhood场景}
   \label{fig:NH_data}
 \end{figure}
 
-\textbf{(3) Business Campus (BC):} 位于校园和商业区的多条环形路线，长度约为3011米，包含了更多的建筑物，如图~\ref{fig:BC_data} 所示。此路线在不同季节采集了3条序列(以BC1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{（3）Business Campus（BC）:} 位于校园和商业区的多条环形路线，长度约为3011米，包含了更多的建筑物，如图~\ref{fig:BC_data} 所示。此路线在不同季节采集了3条序列（以BC1-3代称），每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
-  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{BusinessCampus.png}}
-  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_BC1.png}}
+  \subcaptionbox{场景感知条件}{\includegraphics[width=0.48\linewidth]{BusinessCampus.png}}
+  \subcaptionbox{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_BC1.png}}
   \caption{Business Campus场景}
   \label{fig:BC_data}
 \end{figure}
 
-\textbf{(4) Old Town (OT):} 位于城市中心的商业区环线，长度约为5034米，包含了多种感知条件，此外还有大量的移动物体，如汽车、行人和自行车等，如图~\ref{fig:OT_data} 所示。此路线在不同季节采集了2条序列(以OT1-3代称)，每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
+\textbf{（4）Old Town（OT）:} 位于城市中心的商业区环线，长度约为5034米，包含了多种感知条件，此外还有大量的移动物体，如汽车、行人和自行车等，如图~\ref{fig:OT_data} 所示。此路线在不同季节采集了2条序列（以OT1-2代称），每条序列包含了来自灰度立体相机、IMU和RTK-GNSS的数据。
 
 \begin{figure}
   \centering
-  \subcaptionbox*{场景感知条件}{\includegraphics[width=0.48\linewidth]{OldTown.png}}
-  \subcaptionbox*{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OT1.png}}
+  \subcaptionbox{场景感知条件}{\includegraphics[width=0.48\linewidth]{OldTown.png}}
+  \subcaptionbox{路径卫星图}{\includegraphics[width=0.48\linewidth]{gnss_OT1.png}}
   \caption{Old Town场景}
   \label{fig:OT_data}
 \end{figure}
 
 \subsubsection{KAIST数据集}
-KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ranging)、立体相机、GPS、IMU、编码器和气压计等多种传感器数据，使得用户可以针对不同传感器组合进行多模态信息处理。采集环境涵盖了从多车道宽阔道路到高密度城市街区等多种复杂场景，这不仅体现了实际城市环境中GPS信号不稳定、遮挡严重等问题，也为算法在动态、遮挡等极端条件下的鲁棒性验证提供了真实数据。此外，数据集通过高精度传感器与消费者级传感器的双层数据采集，以及精细的时间同步和标定处理，确保了数据的高准确性和一致性，并提供了基准轨迹及ROS工具，极大地方便了机器人定位、SLAM及环境感知等相关领域的研究与测试。
+KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR（Light Detection And Ranging）、立体相机、GPS、IMU、编码器和气压计等多种传感器数据，使得研究者可以针对不同传感器组合进行多模态信息处理。采集环境涵盖了从多车道宽阔道路到高密度城市街区等多种复杂场景，这不仅体现了实际城市环境中GPS信号不稳定、遮挡严重等问题，也为算法在动态、遮挡等极端条件下的鲁棒性验证提供了真实数据。此外，数据集通过高精度传感器与消费者级传感器的双层数据采集，以及精细的时间同步和标定处理，确保了数据的高准确性和一致性，并提供了基准轨迹及ROS工具，极大地方便了机器人定位、SLAM及环境感知等相关领域的研究与测试。
 
-本文中主要选择了KAIST数据集中的三个场景，分别是20-Highway、26-Dongtan和28-Pangyo，如图~\ref{fig:KAIST_data} 所示。这三个场景分别代表了高速公路、郊区和城市环境，适合于测试本文方法在不同场景下的性能。其中28-Pangyo是一段超过10公里的城市环境，包含了大量的建筑物、行人和车辆，是一个非常具有挑战性的场景。KAIST数据集主要被使用来评估本文的VIO模块性能。
+本章中主要选择了KAIST数据集中的三个场景，分别是20-Highway、26-Dongtan和28-Pangyo，如图~\ref{fig:KAIST_data} 所示。这三个场景分别代表了高速公路、郊区和城市环境，适合于测试本文方法在不同场景下的性能。其中28-Pangyo是一段超过10公里的城市环境，包含了大量的建筑物、行人和车辆，是一个非常具有挑战性的场景。KAIST数据集主要被使用来评估本文的PO-VIO模块性能。
 
 \begin{figure}
   \centering
   \includegraphics[width=0.32\linewidth]{KAIST_20_scene.png}
   \includegraphics[width=0.32\linewidth]{KAIST_26_scene.png}
   \includegraphics[width=0.32\linewidth]{KAIST_28_scene.png}
-  \subcaptionbox*{序列20-Highway}{\includegraphics[width=0.32\linewidth]{KAIST_20.png}}
-  \subcaptionbox*{序列20-Dongtan}{\includegraphics[width=0.32\linewidth]{KAIST_26.png}}
-  \subcaptionbox*{序列20-Pangyo}{\includegraphics[width=0.32\linewidth]{KAIST_28.png}}
+  \subcaptionbox{序列20-Highway}{\includegraphics[width=0.32\linewidth]{KAIST_20.png}}
+  \subcaptionbox{序列20-Dongtan}{\includegraphics[width=0.32\linewidth]{KAIST_26.png}}
+  \subcaptionbox{序列20-Pangyo}{\includegraphics[width=0.32\linewidth]{KAIST_28.png}}
   \caption{KAIST数据集场景}
   \label{fig:KAIST_data}
 \end{figure}
 
 \subsubsection{数据集使用划分}
 
-由于本文需要分别验证3个模块的效果，因此本文将数据集的划分总结如表~\ref{tab:dataset_usage} 所示。表中的每一列代表了一个测试模块，每一行代表了一个数据集，表中的符号代表了数据集的使用方法，其中{\color[HTML]{3166FF} $\bigcirc$}代表使用该序列进行训练或者建图，{\color[HTML]{FD6864}$\bigtriangleup$}代表使用该序列进行测试。
+由于本章需要分别验证3个模块的效果，因此本章将数据集的划分总结如表~\ref{tab:dataset_usage} 所示。表中的每一列代表了一个测试模块，每一行代表了一个数据集，表中的符号代表了数据集的使用方法，其中{\color[HTML]{3166FF} $\bigcirc$}代表使用该序列进行训练或者建图，{\color[HTML]{FD6864}$\bigtriangleup$}代表使用该序列进行测试。
 
 \begin{table}
 \centering
 \begin{threeparttable}
 \caption{数据集使用划分}
+\setlength{\tabcolsep}{3.2mm}{
 \begin{tabular}{lccccccc}
 \toprule
 \multirow{2}{*}{测试模块} & \multicolumn{2}{c}{KITTI}               & \multicolumn{4}{c}{4Seasons}   & KAIST                                         \\ \cline{2-8} 
@@ -139,16 +141,16 @@ KAIST数据集\cite{jjeong-2019-ijrr}同时提供了LiDAR(Light Detection And Ra
 离线建图模块 & {\color[HTML]{3166FF} $\bigcirc$}{\color[HTML]{FD6864}$\bigtriangleup$} &            &                  &                  &               &         &          \\
 PO-VIO模块           &                             &            & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    &         &     {\color[HTML]{FD6864}$\bigtriangleup$}     \\
 地图定位模块           & {\color[HTML]{FD6864}$\bigtriangleup$}           & {\color[HTML]{3166FF} $\bigcirc$} & {\color[HTML]{3166FF} $\bigcirc$}       & {\color[HTML]{FD6864}$\bigtriangleup$} & {\color[HTML]{3166FF} $\bigcirc$}    & {\color[HTML]{FD6864}$\bigtriangleup$} & \\ \bottomrule
-\end{tabular}
+\end{tabular}}
 \label{tab:dataset_usage}
 \begin{tablenotes}
-  \item [a] {\color[HTML]{3166FF} $\bigcirc$} 代表使用该序列进行训练或者建图
-  \item [b] {\color[HTML]{FD6864}$\bigtriangleup$} 代表使用该序列进行测试
+  \item [a] {\color[HTML]{3166FF} $\bigcirc$} 代表使用该序列进行训练或者建图。
+  \item [b] {\color[HTML]{FD6864}$\bigtriangleup$} 代表使用该序列进行测试。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-KITTI数据集参与离线建图和地图定位两个模块的测试：在评估建图过程时，使用来自单目灰度相机的完整图像集；在评估整体性能时由于KITTI数据集未直接提供沿同一路径的多次行驶数据，本文中通过使用不同的相机模拟多次行驶。具体而言，使用部分彩色相机拍摄的图像进行离线建图过程，然后使用灰度相机拍摄的图像测试紧耦合地图定位的精度。建图图像的比例设置为0.25，即只使用四分之一的彩色图像来构建先验地图，并在完整的灰度图像集上进行定位。
+KITTI数据集参与离线建图和地图定位两个模块的测试：在评估建图过程时，使用来自单目灰度相机的完整图像集；在评估整体性能时由于KITTI数据集未直接提供沿同一路径的多次行驶数据，本章中通过使用不同的相机模拟多次行驶。具体而言，使用部分彩色相机拍摄的图像进行离线建图过程，然后使用灰度相机拍摄的图像测试紧耦合地图定位的精度。建图图像的比例设置为0.25，即只使用四分之一的彩色图像来构建先验地图，并在完整的灰度图像集上进行定位。
 
 4Seasons数据集参与PO-VIO和地图定位两个模块的测试：在评估PO-VIO模块时，使用NH1、BC1和OT1的数据作为训练数据，OF1-5作为测试数据；在评估地图定位性能时，使用OF1、NH1、BC1和OT1作为建图数据，OF2-5、NH2-7、BC2-3和OT2-3作为测试数据。此外由于地图定位模块需要使用PO-VIO结果，而PO-VIO的训练数据与地图定位的测试数据没有重合，所以可以直接使用PO-VIO的结果作为紧耦合地图定位的输入而不需要担心训练数据中混入了测试数据。
 
@@ -156,7 +158,7 @@ KAIST数据集参与PO-VIO模块的测试：使用序列20-Highway、26-Dongtan�
 
 \subsubsection{评价指标}
 
-本文实验中使用绝对轨迹误差(Absolute Translation Error, ATE)\cite{sturm2012benchmark}和相对位姿误差(Relative Pose Error, RPE)\cite{geiger2012we}来评估定位性能。其中绝对轨迹误差只评估位移分量，记做$ATE_t$，单位为“米”(m)；相对位姿误差评估了相对平移和相对旋转的误差，分别记做$RPE_{t}$和$RPE_{r}$，单位分别为“米/100米”(m/100m)和“度/100米”($\degree$/100m)，$RPE_{t}$的计算是在每100米的间隔中计算当前定位结果与真值(Ground Truth)的平移误差，$RPE_{r}$的计算是在每100米的间隔中计算当前定位结果与真值之间的旋转角度误差。
+本章实验中使用绝对轨迹误差（Absolute Translation Error, ATE）\cite{sturm2012benchmark}和相对位姿误差（Relative Pose Error, RPE）\cite{geiger2012we}来评估定位性能。其中绝对轨迹误差只评估位移分量，记做$ATE_t$，单位为“米”（m）；相对位姿误差评估了相对平移和相对旋转的误差，分别记做$RPE_{t}$和$RPE_{r}$，单位分别为“米/100米”（m/100m）和“度/100米”（$\degree$/100m），$RPE_{t}$的计算是在每100米的间隔中计算当前定位结果与真值（Ground Truth）的平移误差，$RPE_{r}$的计算是在每100米的间隔中计算当前定位结果与真值之间的旋转角度误差。
 
 $ATE_t$的计算方式为可以表示为：
 \begin{equation}
@@ -169,21 +171,25 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
   RPE_{t} &= \sqrt{\frac{1}{|\mathcal{S}|}\sum_{(i,j) \in \mathcal{S}}\| \text{trans}\left ((\symbf{T}_{gt,j}^{-1} \cdot \symbf{T}_{gt,i})^{-1}\cdot (\symbf{T}_{est,j}^{-1} \cdot \symbf{T}_{est,i}) \right ) \|_2^2} \\
   RPE_{r} &= \sqrt{\frac{1}{|\mathcal{S}|}\sum_{(i,j) \in \mathcal{S}}\| \text{rot}\left ((\symbf{T}_{gt,j}^{-1} \cdot \symbf{T}_{gt,i})^{-1}\cdot (\symbf{T}_{est,j}^{-1} \cdot \symbf{T}_{est,i}) \right ) \|_2^2},
 \end{align}
-其中$\text{rot}(\cdot)$表示提取转换矩阵的旋转部分，$\mathcal{S}$表示相对位姿误差计算的间隔为100米的两帧集合。相对位姿误差的计算方式更加追求描述相对变换，能更好反映出里程计的性能。此外相对位姿误差的计算方式对于坐标系的选择不如绝对轨迹误差敏感，但也有一定要求，本文使用\citet{li2023textslam}提出的方法首先对估计的轨迹与真值轨迹对齐，然后再计算相应数值。
+其中$\text{rot}(\cdot)$表示提取转换矩阵的旋转部分，$\mathcal{S}$表示相对位姿误差计算的间隔为100米的两帧集合，数值计算前使用Li等\cite{li2023textslam}提出的方法对估计轨迹与真值轨迹对齐。
 
-在实验结果汇报中，由于KITTI数据集提供的真值格式与其他数据集不同，所以在计算方法中，KITTI由官方提供的计算工具进行计算，数值精度最高保留2位小数；4Seasons和KAIST数据集上的实验结果则使用\citet{grupp2017evo}提出的开源工具包EVO进行计算，精度相对较高，可以保留6位小数，方便更精确的对比。
+选择ATE与RPE作为评估指标，是当前SLAM和VIO研究中广泛接受且标准化的评估方案：ATE衡量估计轨迹与真实轨迹之间的位置偏差，能够反映整个系统在地图构建或全局定位中的累积误差；RPE侧重于系统在两个时刻之间的相对变换误差，反映了算法对帧间运动的建模与估计能力；此外当系统存在跳变、漂移、跟踪失败等问题时，RPE更容易反映出其在某一段时间内的性能不稳定。因此，本章选择同时汇报这两类指标，以确保对系统性能的全面评估。
+
+% 相对位姿误差的计算方式更加追求描述相对变换，能更好反映出里程计的性能。此外相对位姿误差的计算方式对于坐标系的选择不如绝对轨迹误差敏感，但也有一定要求，本章使用Lin等\cite{li2023textslam}提出的方法首先对估计的轨迹与真值轨迹对齐，然后再计算相应数值。
+
+% 在实验结果汇报中，由于KITTI数据集提供的真值格式与其他数据集不同，所以在计算方法中，KITTI由官方提供的计算工具进行计算，数值精度最高保留2位小数；4Seasons和KAIST数据集上的实验结果则使用Grupp等\cite{grupp2017evo}提出的开源工具包EVO进行计算，精度相对较高，可以保留6位小数，方便更精确的对比。
 
 \section{离线建图模块测试}
-对于离线建图模块的性能测试，本文以地图关键帧的位姿评估来定量对比建图精度，实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。
+对于离线建图模块的性能测试，本节以地图关键帧的位姿评估来定量对比建图精度，实验中选择了KITTI数据集的所有序列来评估本文的建图方法以及其他几种建图方法，并使用三种指标进行对比，对比方法包括GNSS测量值、COLMAP~\cite{schonberger2016structure}、VINS-Stereo~\cite{qin2019a} 以及本文的离线建图方法。建图结果如表~\ref{tab:map_ate} 和表~\ref{tab:map_rpe} 所示。
 
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{KITTI数据集建图$ATE_t$\textdownarrow{}对比}
+\caption{多种建图方式在KITTI数据集上的$ATE_t$\textdownarrow{}对比}
 \setlength{\tabcolsep}{5mm}
 \begin{tabular}{lcccc}
 \toprule
-序列 & GNSS(上限) & COLMAP*\cite{schonberger2016structure} & VINS-Stereo\cite{qin2019a} & 离线建图          \\ \midrule
+序列 & GNSS（上限） & COLMAP*\cite{schonberger2016structure} & VINS-Stereo\cite{qin2019a} & 离线建图          \\ \midrule
 00 & 0.03 & 5.61   & 5.95   & \cellcolor[HTML]{FFCCC9}\textbf{0.33} \\
 01 & 0.06 & N/A    & 6.49   & \cellcolor[HTML]{FFCCC9}\textbf{0.17} \\
 02 & 0.03 & N/A    & 5.99   & \cellcolor[HTML]{FFCCC9}\textbf{0.61} \\
@@ -197,8 +203,8 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 \end{tabular}
 \label{tab:map_ate}
 \begin{tablenotes}
-  \item [a] 星号*表示COLMAP的结果经过了尺度调整
-  \item [b] VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量
+  \item [a] 星号*表示COLMAP的结果经过了尺度调整。
+  \item [b] VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
@@ -208,7 +214,7 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{KITTI数据集建图RPE\textdownarrow{}对比}
+\caption{多种建图方式在KITTI数据集上的RPE\textdownarrow{}对比}
 \begin{tabular}{lcccccc}
 \toprule
 \multirow{2}{*}{序列} & \multicolumn{3}{c}{$RPE_t \downarrow$}              & \multicolumn{3}{c}{$RPE_r\downarrow$}                    \\ \cline{2-7} 
@@ -227,8 +233,8 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 \end{tabular}
 \label{tab:map_rpe}
 \begin{tablenotes}
-  \item [a] 星号*表示COLMAP的结果经过了尺度调整
-  \item [b] VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量
+  \item [a] 星号*表示COLMAP的结果经过了尺度调整。
+  \item [b] VINS-Stereo表示VINS-Fusion的双目版本，使用双目图片和GNSS测量。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
@@ -237,24 +243,25 @@ $RPE_{t}$和$RPE_{r}$的计算方式分别为：
 
 COLMAP方法作为一个流行的SfM框架，代表了仅使用图像的建图性能。基础的COLMAP使用SIFT\cite{lowe2004distinctive}描述符进行建图，而本文的建图特征是基于深度神经网络。VINS-Stereo是VINS-Fusion的双目版本，VINS-Fusion是一种广泛使用的松耦合状态估计器，集成了视觉、惯性和GNSS测量。实验中使用双目图像输入，并结合GNSS测量，代表典型的GNSS辅助视觉建图方法。本文所提出的离线建图模块也是一种GNSS辅助视觉建图方法，其性能将与上述方法进行比较。
 
-VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地图，因此可以在所有指标上进行对比。但是COLMAP无法在没有额外位置先验的情况下重建真实世界尺度的地图，这使得直接比较绝对平移结果不公平。因此，实验中首先对COLMAP的轨迹应用Sim3变换调整框架和尺度，将其与真值对齐。Sim3变换参数通过最小化COLMAP位置信息与真值位置之间的最小二乘误差计算得到。对于相对旋转误差，COLMAP 的结果可以直接与其他方法对比。
+VINS-Stereo和本文的离线建图模块均能在真实世界尺度上建立地图，因此可以在所有指标上进行对比。但是COLMAP无法在没有额外位置先验的情况下重建具有真实世界尺度的地图，这使得直接比较绝对平移结果不公平。因此，实验中首先对COLMAP的轨迹应用Sim3变换调整坐标系和尺度，将其与真值对齐。Sim3变换参数通过最小化COLMAP位置信息与真值位置之间的最小二乘误差计算得到。对于相对旋转误差，COLMAP 的结果可以直接与其他方法对比。
 
 表\ref{tab:map_ate}和表\ref{tab:map_rpe}比较了ATE和RPE指标，结果表明本文的离线建图方法在所有候选方法中表现最佳。与COLMAP的对比表明，本文的建图方法在平移精度上显著提升了视觉建图性能。作为一种增量式SfM方法，COLMAP受到累计漂移的影响，导致平移精度较差。本文的方法通过结合GNSS位置先验约束了漂移，实验结果验证了其在降低绝对平移误差和相对平移误差方面的有效性。此外，通过表中数据可以发现COLMAP方法在许多序列上由于无法初始化前两帧图像而建图失败。而本文中基于深度学习的特征点可靠地完成初始化，体现了深度学习特征优势。
 
 与VINS-Stereo的对比也表明，本文提出的方法优于松耦合的GNSS辅助视觉建图方法。VINS-Stereo尝试利用GNSS测量校正视觉SLAM的位置估计，但这种校正不直接影响位姿优化过程，而本文方法将GNSS与视觉观测融合，使得平移先验能够直接影响位姿估计。因此，本文提出的建图方法在整体性能上表现最佳。
 
-在相对旋转误差$RPE_r$方面，本文方法在大多数序列中也表现出优越性能。相对旋转误差反映了位姿估计的准确性，本文方法和COLMAP都基于离线的三维重建方法，能够实现全局优化，所以两种方的位姿估计精度相较于VINS-Stereo有明显提升。由于GNSS测量不提供旋转约束，本文的方法与COLMAP在旋转精度上的差异较小。
+在相对旋转误差$RPE_r$方面，本文方法在大多数序列中也表现出优越性能。相对旋转误差反映了位姿估计的准确性，本文方法和COLMAP都基于离线的三维重建方法，能够实现全局优化，所以两种方的位姿估计精度相较于VINS-Stereo有明显提升。由于GNSS测量不提供旋转约束，本文的方法与COLMAP在旋转精度上的差异较小，如表~\ref{tab:map_rpe}中的指标$RPE_r$所示。
 
-\section{PO-VIO模块测试}
+\section{伪观测视觉惯性里程计模块测试}
 
 \subsection{车身运动模式判别方法的性能测试}
 PO-VIO的运行过程中使用到了车身运动模式的判别结果，并且车身运动模式判别的精度对里程计精度有着重要的影响，因此对PO-VIO的效果展示首先从车身运动模式的判别结果开始。
 
-车身运动模式的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身运动模式的两个判别因子$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身运动模式判别方法在所有指标上均表现出色，具有较高的准确性和鲁棒性。
+车身运动模式的判别结果如表~\ref{tab:pose_detection} 所示，表中展示了对于车身运动模式的两个判别因子$z^{FOR},z^{LAT}$判别的查准率、召回率、F1得分以及准确率。结果表明本文所提出的车身运动模式判别方法在所有指标上均表现出色，且具有较好的鲁棒性。
 
 \begin{table}
 \centering
-\caption{车身运动模式预测效果}
+\caption{车身运动模式判别网络性能测试}
+\setlength{\tabcolsep}{6mm}{
 \begin{tabular}{lccccc}
 \toprule
 数据集 &  因子  & 查准率  & 召回率  & F1得分 & 准确率  \\ \midrule
@@ -263,82 +270,141 @@ PO-VIO的运行过程中使用到了车身运动模式的判别结果，并且�
 \multirow{2}{*}{KAIST}    & $z^{FOR}$ & 0.65 & 0.74 & 0.69 & 0.98 \\
                           & $z^{LAT}$ & 0.99 & 0.88 & 0.93 & 0.87 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \label{tab:pose_detection}
 \end{table}
 
-需要注意的是，由于在KAIST数据集上的车身运动模式判别对于$z^{FOR}$的查准率较低，因此在后续KAIST数据集测试中，本文放弃了这一车身运动模式因子的使用，仅使用车身运动模式因子$z^{LAT}$来进行车身运动学约束。
+需要注意的是，由于在KAIST数据集上的车身运动模式判别对于$z^{FOR}$的查准率较低，因此在后续KAIST数据集测试中，放弃了这一车身运动模式因子的使用，仅使用车身运动模式因子$z^{LAT}$来进行车身运动学约束。
 
-\subsection{PO-VIO的性能测试}
+\subsection{伪观测视觉惯性里程计的性能测试}
 
+PO-VIO的性能测试在4Seasons和KAIST两个数据集上进行。其中4Seasons的测试与多种VIO进行了对比，KAIST数据集上的测试主要验证本文改进与基线方法的差异，因此只汇报基线方法及相应改进试验结果。
 \subsubsection{4Seasons数据集测试}
-在验证过车身运动模式判别的效果后，本文将车身运动模式判别加入到VIO中，在其余序列上与其他几种VIO方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的VIO方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
+在验证过车身运动模式判别的效果后，本节将车身运动模式判别加入到VIO中，在其余序列上与其他几种VIO方法进行对比，对比方法包括DSO~\cite{von2018direct}、OKVIS2~\cite{leutenegger2022okvis2}、BASALT~\cite{usenko2019visual}、OpenVINS~\cite{Geneva2020ICRA}、VINS-Mono~\cite{qin2018vins}、ORB-SLAM3~\cite{campos2021orb} 以及本文的PO-VIO方法。需要说明的，除了DSO和ORB-SLAM3以外，其他方法均为单目相机+IMU运行，DSO和ORB-SLAM3的单目初始化过程无法成功，所以本文选择其双目版本进行初始化，在表中以星号*标出。具体的效果对比如表~\ref{tab:vio_ate} 和表~\ref{tab:vio_rpe} 所示，其中使用粗体和红底标出最佳表现。
+
+% \begin{table}
+% \centering
+% \begin{threeparttable}
+% \caption{视觉惯性里程计的$ATE_t$\textdownarrow{}对比}
+% \begin{tabular}{lcccccc}
+% \toprule
+% 方法 & 类型           & OL1 & OL2 & OL3 & OL4 & OL5 \\ \midrule
+% OKVIS2          & \multirow{6}{*}{VIO}    & \multicolumn{5}{c}{\textgreater{}60}                       \\
+% BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                       \\
+% OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+% VINS-Mono       &                         & 15.696389                                & 12.439054                                &20.552186                                & 7.972945                                 & 13.211903                                \\
+% ORB-SLAM3*       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FFCCC9}\textbf{6.931078}                                 \\
+% 本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{8.847395}                                 & \cellcolor[HTML]{FFCCC9}\textbf{4.343367}                                 &  \cellcolor[HTML]{FFCCC9}\textbf{17.193425}                                & \cellcolor[HTML]{FFCCC9}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
+% DSO*         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
+% OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
+% BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
+% OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+% VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
+% ORB-SLAM3*       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FFCCC9}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FFCCC9}\textbf{5.520636}                                 \\
+% 本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{3.834251}                                 & \cellcolor[HTML]{FFCCC9}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FFCCC9}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
+% \end{tabular}
+% \label{tab:vio_ate}
+% \begin{tablenotes}
+%   \item [a] 星号*表示ORB-SLAM3和DSO因单目版本初始化困难而使用双目版本
+%   \item [b] LC表示回环检测(Loop Closure)
+%   \item [c] N/A表示方法在该序列上无法运行
+%   \item [d] \textgreater{}60表示方法在该序列上的误差大于60米
+% \end{tablenotes}
+% \end{threeparttable}
+% \end{table}
 
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{视觉惯性里程计的$ATE_t$\textdownarrow{}对比}
+\caption{多种里程计在4Seasons数据集上的$ATE_t$\textdownarrow{}对比}
+\setlength{\tabcolsep}{4.8mm}{
 \begin{tabular}{lcccccc}
 \toprule
 方法 & 类型           & OL1 & OL2 & OL3 & OL4 & OL5 \\ \midrule
 OKVIS2          & \multirow{6}{*}{VIO}    & \multicolumn{5}{c}{\textgreater{}60}                       \\
 BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                       \\
-OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
-VINS-Mono       &                         & 15.696389                                & 12.439054                                &20.552186                                & 7.972945                                 & 13.211903                                \\
-ORB-SLAM3*       &                         & 30.141148                                & 26.845080                                & 31.387398                                & 15.335389                                & \cellcolor[HTML]{FFCCC9}\textbf{6.931078}                                 \\
-本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{8.847395}                                 & \cellcolor[HTML]{FFCCC9}\textbf{4.343367}                                 &  \cellcolor[HTML]{FFCCC9}\textbf{17.193425}                                & \cellcolor[HTML]{FFCCC9}\textbf{7.653040}                                 & 11.009781                                \\ \midrule
-DSO*         & \multirow{7}{*}{VIO+LC} & 5.575564                                 & 6.889360                                 & 13.183826                                & 8.048476                                 & 6.681058                                 \\
+OpenVINS        &                         & 37.91                                & 52.71                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+VINS-Mono       &                         & 15.69                                & 12.43                                &20.55                                & 7.97                                & 13.21                                \\
+ORB-SLAM3*       &                         & 30.14                                & 26.84                                & 31.38                                & 15.33                                & \cellcolor[HTML]{FFCCC9}\textbf{6.93}                                 \\
+本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{8.84}                                 & \cellcolor[HTML]{FFCCC9}\textbf{4.34}                                 &  \cellcolor[HTML]{FFCCC9}\textbf{17.19}                                & \cellcolor[HTML]{FFCCC9}\textbf{7.65}                                 & 11.00                                \\ \midrule
+DSO*         & \multirow{7}{*}{VIO+LC} & 5.57                                 & 6.88                                 & 13.18                                & 8.04                                 & 6.68                                 \\
 OKVIS2          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
 BASALT          &                         & \multicolumn{5}{c}{\textgreater{}60}                         \\
-OpenVINS        &                         & 37.917951                                & 52.712329                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
-VINS-Mono       &                         & 9.368280                                 & 7.878626                                 & 10.664015                                & 7.661955                                 & 8.083566                                 \\
-ORB-SLAM3*       &                         & 4.902441                                 & 15.621815                                & \cellcolor[HTML]{FFCCC9}\textbf{6.288431}                                 & 5.073350                                 & \cellcolor[HTML]{FFCCC9}\textbf{5.520636}                                 \\
-本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{3.834251}                                 & \cellcolor[HTML]{FFCCC9}\textbf{3.321656}                                 & 11.670275                                & \cellcolor[HTML]{FFCCC9}\textbf{4.972996}                                 & 7.652689                                 \\ \bottomrule
-\end{tabular}
+OpenVINS        &                         & 37.91                                & 52.71                                & {\textgreater{}60}                               & N/A                                      & N/A                                      \\
+VINS-Mono       &                         & 9.36                                 & 7.87                                 & 10.66                                & 7.66                                 & 8.08                                 \\
+ORB-SLAM3*       &                         & 4.90                                 & 15.62                                & \cellcolor[HTML]{FFCCC9}\textbf{6.28}                                 & 5.07                                 & \cellcolor[HTML]{FFCCC9}\textbf{5.52}                                 \\
+本文PO-VIO            &                         & \cellcolor[HTML]{FFCCC9}\textbf{3.83}                                 & \cellcolor[HTML]{FFCCC9}\textbf{3.32}                                 & 11.67                                & \cellcolor[HTML]{FFCCC9}\textbf{4.97}                                 & 7.65                                 \\ \bottomrule
+\end{tabular}}
 \label{tab:vio_ate}
 \begin{tablenotes}
-  \item [a] 星号*表示ORB-SLAM3和DSO因单目版本初始化困难而使用双目版本
-  \item [b] LC表示回环检测(Loop Closure)
-  \item [c] N/A表示方法在该序列上无法运行
-  \item [d] \textgreater{}60表示方法在该序列上的误差大于60米
+  \item [a] 星号*表示ORB-SLAM3和DSO因单目版本初始化困难而使用双目版本。
+  \item [b] LC表示回环（Loop Closure）检测。
+  \item [c] N/A表示方法在该序列上无法运行。
+  \item [d] \textgreater{}60表示方法在该序列上的误差大于60米。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环(Loop Closure)检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的PO-VIO在配合回环检测之后依旧可以取得较好的效果。
+在$ATE_t$的比较中，除了单纯的里程计对比，本文还加入了里程计配合回环（Loop Closure）检测优化的效果，以VIO+LC表示。加入了回环检测优化的方法会有更高的精度，但是由于回环检测是一种对过去累计误差的修正，具有滞后性，所以其高精度结果一般难以被实时使用。此处汇报VIO+LC的结果是为了展示本文提出的PO-VIO在配合回环检测之后依旧可以取得较好的效果。
 
-另外，有些方法在某些序列上运行失败，所以在表中使用N/A表示；有些方法可以运行成功，但是中途崩溃，产生的轨迹与真值误差过大，所以在表中我们仅汇报误差小于60米的结果，对于误差大于60米的结果我们使用\textgreater{}60表示。
+另外，有些方法在某些序列上运行失败，所以在表中使用N/A表示；有些方法可以运行成功，但是中途崩溃，产生的轨迹与真值误差过大，所以在表中仅汇报误差小于60米的结果，对于误差大于60米的结果使用\textgreater{}60表示。
 
 从表~\ref{tab:vio_ate} 中可以看出，在单纯的VIO对比中，本文所提出的PO-VIO方法在大多数序列上$ATE_t$表现出色，相较于其他方法具有更高的精度。在VIO+LC的对比中，本文的方法在大多数序列上仍然有最好的表现，但是在OL3和OL5序列上的表现相对较差，ORB-SLAM3在这两个序列上表现较好。此外，本文PO-VIO基于VINS-Mono改进而来，所以在与VINS-Mono的对比中全面领先，说明本文PO-VIO中的改进有一定效果。
+
+% \begin{table}
+% \centering
+% \begin{threeparttable}
+% \caption{视觉惯性里程计的RPE\textdownarrow{}对比}
+% \begin{tabular}{lcccccc}
+% \toprule
+% 方法        & 指标                    & OF1               & OF2               & OF3               & OF4               & OF5               \\ \midrule
+% OpenVINS  & \multirow{4}{*}{$RPE_t$} & 7.576759          & 8.893709          & 12.631715         & N/A               & N/A               \\
+% VINS-Mono &                       & 3.921487          & 2.330876          & 5.648737          & 3.447067          & 2.598062          \\
+% ORB-SLAM3* &                       & \cellcolor[HTML]{FFCCC9}\textbf{1.962480} & 2.361792          & \cellcolor[HTML]{FFCCC9}\textbf{4.987597} & \cellcolor[HTML]{FFCCC9}\textbf{2.963017} & \cellcolor[HTML]{FFCCC9}\textbf{1.176156} \\
+% 本文PO-VIO      &                       & 3.459246          & \cellcolor[HTML]{FFCCC9}\textbf{1.986364} & 5.887755          & 3.731419          & 3.227312          \\ \midrule
+% OpenVINS  & \multirow{4}{*}{$RPE_r$} & 2.122706          & 1.752747          & 3.904525          & N/A               & N/A               \\
+% VINS-Mono &                       & 1.062495          & 0.783557          & 3.411987          & 1.747575          & 0.990526          \\
+% ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.002619          & 1.764101          & 0.981966          \\
+% 本文PO-VIO       &                       & \cellcolor[HTML]{FFCCC9}\textbf{0.818242} & \cellcolor[HTML]{FFCCC9}\textbf{0.776345} & \cellcolor[HTML]{FFCCC9}\textbf{2.543815} & \cellcolor[HTML]{FFCCC9}\textbf{1.732620} & \cellcolor[HTML]{FFCCC9}\textbf{0.882806} \\ \bottomrule
+% \end{tabular}
+% \label{tab:vio_rpe}
+% \begin{tablenotes}
+%   \item [a] 星号*表示ORB-SLAM3因单目版本初始化困难而使用双目版本
+%   \item [b] N/A表示方法在该序列上无法运行
+%   \item [c] 由于OKVIS2和BASALT在$ATE_t$指标下误差过大，此处不再汇报RPE指标
+% \end{tablenotes}
+% \end{threeparttable}
+% \end{table}
 
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{视觉惯性里程计的RPE\textdownarrow{}对比}
+\caption{多种里程计在4Seasons数据集中的RPE\textdownarrow{}对比}
+\setlength{\tabcolsep}{5.5mm}{
 \begin{tabular}{lcccccc}
 \toprule
 方法        & 指标                    & OF1               & OF2               & OF3               & OF4               & OF5               \\ \midrule
-OpenVINS  & \multirow{4}{*}{$RPE_t$} & 7.576759          & 8.893709          & 12.631715         & N/A               & N/A               \\
-VINS-Mono &                       & 3.921487          & 2.330876          & 5.648737          & 3.447067          & 2.598062          \\
-ORB-SLAM3* &                       & \cellcolor[HTML]{FFCCC9}\textbf{1.962480} & 2.361792          & \cellcolor[HTML]{FFCCC9}\textbf{4.987597} & \cellcolor[HTML]{FFCCC9}\textbf{2.963017} & \cellcolor[HTML]{FFCCC9}\textbf{1.176156} \\
-本文PO-VIO      &                       & 3.459246          & \cellcolor[HTML]{FFCCC9}\textbf{1.986364} & 5.887755          & 3.731419          & 3.227312          \\ \midrule
-OpenVINS  & \multirow{4}{*}{$RPE_r$} & 2.122706          & 1.752747          & 3.904525          & N/A               & N/A               \\
-VINS-Mono &                       & 1.062495          & 0.783557          & 3.411987          & 1.747575          & 0.990526          \\
-ORB-SLAM3* &                       & 0.883776          & 0.894313          & 3.002619          & 1.764101          & 0.981966          \\
-本文PO-VIO       &                       & \cellcolor[HTML]{FFCCC9}\textbf{0.818242} & \cellcolor[HTML]{FFCCC9}\textbf{0.776345} & \cellcolor[HTML]{FFCCC9}\textbf{2.543815} & \cellcolor[HTML]{FFCCC9}\textbf{1.732620} & \cellcolor[HTML]{FFCCC9}\textbf{0.882806} \\ \bottomrule
-\end{tabular}
+OpenVINS  & \multirow{4}{*}{$RPE_t$\textdownarrow{}} & 7.57          & 8.89          & 12.63         & N/A               & N/A               \\
+VINS-Mono &                       & 3.92          & 2.33          & 5.64          & 3.44          & 2.59          \\
+ORB-SLAM3* &                       & \cellcolor[HTML]{FFCCC9}\textbf{1.96} & 2.36          & \cellcolor[HTML]{FFCCC9}\textbf{4.98} & \cellcolor[HTML]{FFCCC9}\textbf{2.96} & \cellcolor[HTML]{FFCCC9}\textbf{1.17} \\
+本文PO-VIO      &                       & 3.45          & \cellcolor[HTML]{FFCCC9}\textbf{1.98} & 5.88          & 3.73          & 3.22          \\ \midrule
+OpenVINS  & \multirow{4}{*}{$RPE_r$\textdownarrow{}} & 2.12          & 1.75          & 3.90          & N/A               & N/A               \\
+VINS-Mono &                       & 1.06          & 0.78          & 3.41          & 1.74          & 0.99          \\
+ORB-SLAM3* &                       & 0.88          & 0.89          & 3.00          & 1.76          & 0.98          \\
+本文PO-VIO       &                       & \cellcolor[HTML]{FFCCC9}\textbf{0.81} & \cellcolor[HTML]{FFCCC9}\textbf{0.77} & \cellcolor[HTML]{FFCCC9}\textbf{2.54} & \cellcolor[HTML]{FFCCC9}\textbf{1.73} & \cellcolor[HTML]{FFCCC9}\textbf{0.88} \\ \bottomrule
+\end{tabular}}
 \label{tab:vio_rpe}
 \begin{tablenotes}
-  \item [a] 星号*表示ORB-SLAM3因单目版本初始化困难而使用双目版本
-  \item [b] N/A表示方法在该序列上无法运行
-  \item [c] 由于OKVIS2和BASALT在$ATE_t$指标下误差过大，此处不再汇报RPE指标
+  \item [a] 星号*表示ORB-SLAM3因单目版本初始化困难而使用双目版本。
+  \item [b] N/A表示方法在该序列上无法运行。
+  \item [c] 由于OKVIS2和BASALT在$ATE_t$指标下误差过大，此处不再汇报RPE指标。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-从表~\ref{tab:vio_rpe} 中的结果可以看出，本文PO-VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至VINS-Mono；但是在相对旋转误差$RPE_r$上，本文PO-VIO在所有序列上均表现出色，具有更高的精度。
+从表~\ref{tab:vio_rpe} 中的结果可以看出，本文PO-VIO在相对位姿误差$RPE_t$和$RPE_r$上均表现有较大差异：在相对平移误差$RPE_t$上，本文PO-VIO在OF2上表现最后，但在其他序列上的表现均落后于ORB-SLAM3，甚至在某些序列（OF3-OF5）上落后于基线方法VINS-Mono；但是在相对旋转误差$RPE_r$上，本文PO-VIO在所有序列上均表现出色，具有更高的精度，而且在某些序列（OF3）上相对于基线方法有接近1$\degree$/100m的精度提升，可以看作较大幅度的精度改善。
 
-产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
+产生这一现象的原因可能是：本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，并且在推导雅可比矩阵~\eqref{eq:JrJv}、\eqref{eq:JrJqb}和\eqref{eq:JrJqv}时也只对旋转向量产生梯度，这导致在后端非线性优化时，参数的调整只反映在位姿相关的旋转量上，而不会影响平移量，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
 
 \subsubsection{KAIST数据集测试}
 
@@ -346,26 +412,51 @@ KAIST数据集上的测试如表~\ref{tab:vio_kaist} 所示，表中展示了本
 
 此外为了方便对比，表中还展示了本文设计相对于基线的改进变化量$\Delta$，用红底表示在该指标下进步，绿底表示在该指标下有所退化。在指标方面，此处将常规的$ATE_t$改变为$ATE_t$/km，即每公里的绝对轨迹误差，以平衡里程计在不同行驶距离下的精度表现。
 
+% \begin{table}
+% \centering
+% \begin{threeparttable}
+% \caption{KAIST数据集视觉惯性里程计效果对比}
+% \begin{tabular}{lccccc}
+% \toprule
+% 序列                           & 长度                         & 方法         & $ATE_t$/km\textdownarrow{} & $RPE_t$\textdownarrow{}                           & $RPE_r$\textdownarrow{}  \\ \midrule
+%                               &                            & 基线 & 27.551458   & 19.496478                         & 1.165007 \\
+%                               &                            & 本文PO-VIO      & 26.003915   & 20.164449                         & 0.689197 \\
+% \multirow{-3}{*}{20-Highway} & \multirow{-3}{*}{3.2 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-1.547543}    & \cellcolor[HTML]{9AFF99}\textbf{+0.667971} & \cellcolor[HTML]{FFCCC9}\textbf{-0.475810} \\ \midrule
+%                               &                            & 基线 & 6.917041    & 8.912866                          & 1.581715 \\
+%                               &                            & 本文PO-VIO      & 6.457796    & 6.543866                          & 0.972692 \\
+% \multirow{-3}{*}{26-Dongtan}   & \multirow{-3}{*}{4.0 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.459245}    & \cellcolor[HTML]{FFCCC9}\textbf{-2.369000}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.609023} \\ \midrule
+%                               &                            & 基线 & 5.119043    & 11.795006                         & 0.809538 \\
+%                               &                            & 本文PO-VIO      & 4.592121    & 8.789568                          & 0.705091 \\
+% \multirow{-3}{*}{28-Pangyo}   & \multirow{-3}{*}{11.47 km} & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.526922}    & \cellcolor[HTML]{FFCCC9}\textbf{-3.005438}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.104447} \\ \bottomrule
+% \end{tabular}
+% \label{tab:vio_kaist}
+% \begin{tablenotes}
+%   \item [a] $\Delta$表示本文设计相对于基线的改进变化量
+% \end{tablenotes}
+% \end{threeparttable}
+% \end{table}
+
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{KAIST数据集视觉惯性里程计效果对比}
+\caption{PO-VIO模块在KAIST数据集上的表现}
+\setlength{\tabcolsep}{4.45mm}{
 \begin{tabular}{lccccc}
 \toprule
 序列                           & 长度                         & 方法         & $ATE_t$/km\textdownarrow{} & $RPE_t$\textdownarrow{}                           & $RPE_r$\textdownarrow{}  \\ \midrule
-                              &                            & 基线 & 27.551458   & 19.496478                         & 1.165007 \\
-                              &                            & 本文PO-VIO      & 26.003915   & 20.164449                         & 0.689197 \\
-\multirow{-3}{*}{20-Highway} & \multirow{-3}{*}{3.2 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-1.547543}    & \cellcolor[HTML]{9AFF99}\textbf{+0.667971} & \cellcolor[HTML]{FFCCC9}\textbf{-0.475810} \\ \midrule
-                              &                            & 基线 & 6.917041    & 8.912866                          & 1.581715 \\
-                              &                            & 本文PO-VIO      & 6.457796    & 6.543866                          & 0.972692 \\
-\multirow{-3}{*}{26-Dongtan}   & \multirow{-3}{*}{4.0 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.459245}    & \cellcolor[HTML]{FFCCC9}\textbf{-2.369000}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.609023} \\ \midrule
-                              &                            & 基线 & 5.119043    & 11.795006                         & 0.809538 \\
-                              &                            & 本文PO-VIO      & 4.592121    & 8.789568                          & 0.705091 \\
-\multirow{-3}{*}{28-Pangyo}   & \multirow{-3}{*}{11.47 km} & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.526922}    & \cellcolor[HTML]{FFCCC9}\textbf{-3.005438}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.104447} \\ \bottomrule
-\end{tabular}
+                              &                            & 基线 & 27.55   & 19.49                         & 1.16 \\
+                              &                            & 本文PO-VIO      & 26.00   & 20.16                         & 0.68 \\
+\multirow{-3}{*}{20-Highway} & \multirow{-3}{*}{3.2 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-1.55}    & \cellcolor[HTML]{9AFF99}\textbf{+0.67} & \cellcolor[HTML]{FFCCC9}\textbf{-0.48} \\ \midrule
+                              &                            & 基线 & 6.91    & 8.91                          & 1.58 \\
+                              &                            & 本文PO-VIO      & 6.45    & 6.54                          & 0.97 \\
+\multirow{-3}{*}{26-Dongtan}   & \multirow{-3}{*}{4.0 km}   & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.46}    & \cellcolor[HTML]{FFCCC9}\textbf{-2.37}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.61} \\ \midrule
+                              &                            & 基线 & 5.11    & 11.79                         & 0.80 \\
+                              &                            & 本文PO-VIO      & 4.59    & 8.78                          & 0.70 \\
+\multirow{-3}{*}{28-Pangyo}   & \multirow{-3}{*}{11.47 km} & $\Delta$ & \cellcolor[HTML]{FFCCC9}\textbf{-0.52}    & \cellcolor[HTML]{FFCCC9}\textbf{-3.01}                          & \cellcolor[HTML]{FFCCC9}\textbf{-0.10} \\ \bottomrule
+\end{tabular}}
 \label{tab:vio_kaist}
 \begin{tablenotes}
-  \item [a] $\Delta$表示本文设计相对于基线的改进变化量
+  \item [a] $\Delta$表示本文设计相对于基线的改进变化量。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
@@ -373,82 +464,112 @@ KAIST数据集上的测试如表~\ref{tab:vio_kaist} 所示，表中展示了本
 \begin{figure}
   \centering
   \includegraphics[width=1.0\linewidth]{kaist_cloud.pdf}
-  \caption{KAIST数据集上$RPE_r$\textdownarrow{}分布示意图}
+  \caption{KAIST数据集上的$RPE_r$\textdownarrow{}分布示意图}
   \label{fig:vio_kaist}
 \end{figure}
 
-从表中可以看出，本文设计的PO-VIO在大部分序列上均取得了误差上的改进。对于20-Highway序列，经过改进后，绝对轨迹误差($ATE_t$)从27.55降至26.00，每公里降低约1.55；旋转误差($RPE_r$)也由1.17降低到0.69，减少了约0.48，但相对平移误差($RPE_t$)则略有增加，从19.50上升至20.16。对于26-Dongtan 序列，改进后的$ATE_t$由6.92降至6.46，$RPE_t$从8.91降低到6.54，$RPE_r$也由1.58降低到0.97，三项指标均有明显改善。28-Pangyo序列中，$ATE_t$由5.12降至4.59，$RPE_t$则显著从11.80下降到8.79，而$RPE_r$变化较小，从0.81略降至0.78。
+从表中可以看出，本文设计的PO-VIO在大部分序列上均取得了误差上的改进。对于20-Highway序列，经过改进后，绝对轨迹误差（$ATE_t$）从27.55降至26.00，每公里降低约1.55；旋转误差（$RPE_r$）也由1.16降低到0.68，减少了约0.48，但相对平移误差（$RPE_t$）则略有增加，从19.49上升至20.16。对于26-Dongtan 序列，改进后的$ATE_t$由6.91降至6.45，$RPE_t$从8.91降低到6.54，$RPE_r$也由1.58降低到0.97，三项指标均有明显改善。28-Pangyo序列中，$ATE_t$由5.11降至4.59，$RPE_t$则显著从11.79下降到8.78，而$RPE_r$变化较小，从0.80略降至0.70。
 
 总体来看，尽管20-Highway序列中$RPE_t$有所上升，但本文设计在大部分场景下均能有效降低绝对及相对误差，整体性能得到了提升。
 
-为了展示本文设计的PO-VIO与基线的稳定性效果对比，本文在图~\ref{fig:vio_kaist} 中展示了KAIST数据集上$RPE_r$\textdownarrow{}的分布情况。从图中可以看出，本文的PO-VIO在KAIST数据集上的$RPE_r$\textdownarrow{}分布更加集中，且均值更低，相较于基线有着更好的效果。
+为了展示本文设计的PO-VIO与基线的稳定性效果对比，本文在图~\ref{fig:vio_kaist} 中展示了KAIST数据集上$RPE_r$\textdownarrow{}的分布情况。从图中可以看出，本文PO-VIO在KAIST数据集上的$RPE_r$\textdownarrow{}分布更加集中，且均值更低，相较于基线有着更好的效果。
 
-\subsection{PO-VIO性能提升的来源分析}
-针对PO-VIO性能提升的原因，本文猜测可能是因为本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
+\subsection{伪观测视觉惯性里程计性能提升的来源分析}
+针对PO-VIO性能提升的原因，此处猜测可能是因为本文所提出的伪观测约束项~\eqref{eq:imu_residual} 中仅存在有关旋转和速度的约束，并不直接对平移进行约束，所以在相对平移误差上表现较差，而在相对旋转误差上表现较好。
 
-为了验证这一猜想，本文对车身坐标系的速度量进行分析。分析建立在OF2和OF3两条序列上，这两条序列有着比较突出的特点：OF2序列上本文PO-VIO的$RPE_t$和$RPE_r$均有所提升，但是整体幅度较小；OF3序列上本文PO-VIO的$RPE_t$有所下降，但是$RPE_r$有所提升，而且每100米的旋转误差减小了接近1$\degree$/100m。因此选择这两条序列进行分析，能够更好发现本文的速度伪观测约束在何种条件下会对里程计的效果产生积极影响。两条序列上的速度量在车身坐标系的变化如图~\ref{fig:VIO_velocity} 所示。
+为了验证这一猜想，本文对车身坐标系的速度量进行分析。分析建立在OF2和OF3两条序列上，这两条序列有着比较突出的特点：OF2序列上本文PO-VIO的$RPE_t$和$RPE_r$（相较于基线VINS-Mono）均有所提升，但是整体幅度较小；OF3序列上本文PO-VIO的$RPE_t$有所下降，但是$RPE_r$有较大提升，而且每100米的旋转误差（相较于基线VINS-Mono）减小了接近1$\degree$/100m。因此选择这两条序列进行分析，能够更好发现本文的速度伪观测约束在何种条件下会对里程计的效果产生积极影响。两条序列上的速度量在车身坐标系的变化如图~\ref{fig:VIO_velocity} 所示。
 
 \begin{figure}
   \centering
   \subcaptionbox*{OF2序列}{\includegraphics[width=1.0\linewidth]{VIO_velocity_OF2.pdf}}
   \subcaptionbox*{OF3序列}{\includegraphics[width=1.0\linewidth]{VIO_velocity_OF3.pdf}}
-  \caption{车身速度展示}
+  \caption{OF2与OF3序列上车身三轴向分速度-时间变化示意图}
   \label{fig:VIO_velocity}
 \end{figure}
 
 在每个序列上分别展示了“VIO”、“VIO+伪观测”、“VIO+伪观测-因子”三种情况下的速度变化，其中“VIO”表示使用通用VIO方法获得的速度估计结果；“VIO+伪观测”表示在通用VIO中加入本文所提出的车身状态判断以及伪观测约束后的速度估计结果；“VIO+伪观测-因子”表示在VIO和伪观测约束的基础上，不使用惯性-车体因子进行后端优化。此外，为了将速度变化与车身状态区间直观展示，本文中还将对应车身停止、转弯和直行的区间标注在了速度图中。
 
-从两个序列中的速度变化可以看到：相较于OF2序列，OF3序列的“VIO”在车身横向(X轴方向)和垂直(Z轴方向)速度上有着更大的取值，这说明在OF3序列上基础VIO的速度估计有更大的误差，而在该场景下，经过本文所提出的伪观测约束进行优化后，“VIO+伪观测”横向和垂直速度有了更合理的估计，从而使得OF3上的$RPE_r$有了明显的提升。相较而言，OF2序列上的速度变化较为平缓，所以在该场景下，伪观测约束的加入对于速度估计的影响较小，使得“VIO+伪观测”在OF2序列上的$RPE_r$仅有微弱提升。
+从两个序列中的速度变化可以看到：相较于OF2序列，OF3序列的“VIO”在车身横向（X轴方向）和垂直（Z轴方向）速度上有着更大的数值，这说明在OF3序列上基础VIO的速度估计有更大的误差，而在该场景下，经过本文所提出的伪观测约束进行优化后，“VIO+伪观测”横向和垂直速度有了更合理的估计，从而使得OF3上的$RPE_r$有了明显的提升。相较而言，OF2序列上的速度变化较为平缓，所以在该场景下，伪观测约束的加入对于速度估计的影响较小，使得“VIO+伪观测”在OF2序列上的$RPE_r$仅有微弱提升。
 
-此外，观察两个序列下的速度变化，可以发现在OF2上，“VIO+伪观测”的车身横向和垂直速度全过程都有较为平滑的估计结果，相比之下OF3序列上“VIO+伪观测”在最后阶段出现了较明显的起伏，因此其出现了OF3序列上本文方法的$RPE_t$有所下降的现象，而OF2序列上本文方法的$RPE_t$达到同类方法的最优。
+此外，观察两个序列下的速度变化，可以发现在OF2上，“VIO+伪观测”的车身横向和垂直速度全过程都有较为平滑的估计结果，相比之下OF3序列上“VIO+伪观测”在最后阶段出现了较明显的起伏，因此其出现了OF3序列上本文方法的$RPE_t$有所下降的现象，而OF2序列上本文方法的$RPE_t$达到同类方法的最优。观察OF3序列的车身三轴向速度变化，还可以看到惯性-车体因子优化对于速度估计的影响：在优化时能够保持较稳定的X轴与Z轴零速度；而不优化则只会有较轻微的抑制作用。这表明了惯性-车体因子联合优化的必要性。
 
 
 \subsection{消融实验}
-为了探究本文提出的VIO方法中各个模块的效果，本文进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括“VIO”、“惯性-车体因子”、“伪观测约束”、“车身状态判别”和“车身状态真值”，其中“VIO”是基础配置，其他变量的加入均是在VIO的基础上进行的；“惯性-车体因子”表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；“伪观测约束”表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；“车身状态判别”表示是否根据车身状态判别神经网络的结果而调整后端优化量；“车身状态真值”表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同消融实验下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块。
+为了探究本文提出的VIO方法中各个模块的效果，本节进行了消融实验，消融实验在OF3序列上进行，选择控制的变量包括“VIO”、“惯性-车体因子”、“伪观测约束”、“车身状态判别”和“车身状态真值”，其中“VIO”是基础配置，其他变量的加入均是在VIO的基础上进行的；“惯性-车体因子”表示是否在后端窗口优化时将惯性-车体对齐参数作为优化变量；“伪观测约束”表示是否在后端窗口优化时加入含有伪观测约束的IMU残差；“车身状态判别”表示是否根据车身状态判别神经网络的结果而调整后端优化量；“车身状态真值”表示是否根据车身状态的真值而调整后端优化量，其可以看做是车身状态判别的上限。实验结果如表~\ref{tab:vio_ablation} 所示。表中展示了在不同实验设置下的$ATE_t$、$RPE_t$和$RPE_r$的结果，其中$\checkmark$表示使用了对应的模块。
+
+% \begin{table}
+% \centering
+% \caption{PO-VIO消融实验}
+% \begin{tabular}{cccccccc}
+% \toprule
+% VIO        & \begin{tabular}[c]{@{}c@{}}惯性-车体\\ 因子\end{tabular} & \begin{tabular}[c]{@{}c@{}}伪观测\\ 约束\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 判别\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 真值\end{tabular} & $ATE_t$\textdownarrow{}       & $RPE_t$\textdownarrow{}     & $RPE_r$\textdownarrow{}      \\ \midrule
+% $\checkmark$           &                          &                        &                         &                         & 20.552186            & 5.648737             & 3.411987             \\
+% $\checkmark$           & $\checkmark$               & $\checkmark$             &                         &                         & 23.269810            & 5.594315             & 2.588779             \\
+% $\checkmark$           & $\checkmark$               & $\checkmark$             & $\checkmark$              &                         & 17.193425            & 5.887755             & 2.543815             \\
+% $\checkmark$           & $\checkmark$               & $\checkmark$             &                         & $\checkmark$              & 14.685789            & 5.277349             & 2.522826             \\
+% $\checkmark$           &                          & $\checkmark$             &                         & $\checkmark$              & 17.361096            & 5.099256             & 2.577359             \\ \bottomrule
+% \end{tabular}
+% \label{tab:vio_ablation}
+% \end{table}
 
 \begin{table}
 \centering
-\caption{PO-VIO消融实验}
+\caption{PO-VIO模块消融实验}
+\setlength{\tabcolsep}{3mm}{
 \begin{tabular}{cccccccc}
 \toprule
 VIO        & \begin{tabular}[c]{@{}c@{}}惯性-车体\\ 因子\end{tabular} & \begin{tabular}[c]{@{}c@{}}伪观测\\ 约束\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 判别\end{tabular} & \begin{tabular}[c]{@{}c@{}}车身状态\\ 真值\end{tabular} & $ATE_t$\textdownarrow{}       & $RPE_t$\textdownarrow{}     & $RPE_r$\textdownarrow{}      \\ \midrule
-$\checkmark$           &                          &                        &                         &                         & 20.552186            & 5.648737             & 3.411987             \\
-$\checkmark$           & $\checkmark$               & $\checkmark$             &                         &                         & 23.269810            & 5.594315             & 2.588779             \\
-$\checkmark$           & $\checkmark$               & $\checkmark$             & $\checkmark$              &                         & 17.193425            & 5.887755             & 2.543815             \\
-$\checkmark$           & $\checkmark$               & $\checkmark$             &                         & $\checkmark$              & 14.685789            & 5.277349             & 2.522826             \\
-$\checkmark$           &                          & $\checkmark$             &                         & $\checkmark$              & 17.361096            & 5.099256             & 2.577359             \\ \bottomrule
-\end{tabular}
+$\checkmark$           &                          &                        &                         &                         & 20.55            & 5.64             & 3.41             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             &                         &                         & 23.26            & 5.59             & 2.58             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             & $\checkmark$              &                         & 17.19            & 5.88             & 2.54             \\
+$\checkmark$           & $\checkmark$               & $\checkmark$             &                         & $\checkmark$              & 14.68            & 5.27             & 2.52             \\
+$\checkmark$           &                          & $\checkmark$             &                         & $\checkmark$              & 17.36            & 5.09             & 2.57             \\ \bottomrule
+\end{tabular}}
 \label{tab:vio_ablation}
 \end{table}
 
-表中第二行的含义是不论车身处于何种状态，均使用直行时的车身速度假设，因此从前两行的对比中可以发现，当使用了惯性车体因子和伪观测约束后，$ATE_t$产生了明显的下降，但是$RPE_t$有了轻微的改善，$RPE_r$有了明显的改善。这说明了惯性车体因子和伪观测约束的加入对于车身旋转的估计有着重要的影响，但是这会对平移的估计产生一定负面影响。即说明如果全程使用直行时的车身速度假设，会对里程计的平移估计精度产生负面影响，但对旋转的估计精度有积极影响。
+表中第二行的含义是不论车身处于何种状态，均使用直行时的车身速度假设，因此从前两行的对比中可以发现，当使用了惯性车体因子和伪观测约束后，$ATE_t$产生了明显的上升，但是$RPE_t$有了轻微的下降，$RPE_r$有了明显的下降。这说明了惯性车体因子和伪观测约束的加入对于车身旋转的估计有着重要的影响，但是这会对平移的估计产生一定负面影响。即说明如果全程使用直行时的车身速度假设，会对里程计的平移估计精度产生负面影响，但对旋转的估计精度有积极影响。
 
-表中第三行在第二行的基础上加入了对车身状态的预测，虽然预测与真实情况可能存在偏差，但是可以从数据上得出：当加入了车身状态判别后，$ATE_t$产生明显的下降，$RPE_t$有所增加，$RPE_r$有轻微改善，这说明了车身状态判别对于绝对定位精度的提升有着重要的影响。虽然其本身存在的状态预测误差则会对相对位移的估计产生一定的负面影响，但是综合来看其对于绝对位置和旋转角度估计的精度提升可以使其忽略对相对位移估计产生的负面影响。
+表中第三行在第二行的基础上加入了对车身状态的预测，虽然预测与真实情况可能存在偏差，但是可以从数据上得出：当加入了车身状态判别后，$ATE_t$产生明显的下降，$RPE_t$有所增加，$RPE_r$有轻微下降，这说明了车身状态判别对于绝对定位精度的提升有着重要的影响。虽然其本身存在的状态预测误差则会对相对位移的估计产生一定的负面影响，但是综合来看其对于绝对位置和旋转角度估计的精度提升可以使其忽略对相对位移估计产生的负面影响。
 
 表中第四行在第三行的基础上将车身状态的预测值替换为真值，这一行为对$ATE_t$、$RPE_t$和$RPE_r$三个指标都产生了增益效果，这侧面证明了：当使用预测值时产生的相对位移估计精度损失是由于预测值的误差导致的，而当使用真值时，这一误差被消除，所以在$ATE_t$、$RPE_t$和$RPE_r$三个指标上都取得了较大的进步。
 
 表中最后一行在第四行的基础上去掉了惯性车体因子，即在优化过程中不优化惯性-车体因子，而仅使用初始量。这一行相较于第四行的结果是：$ATE_t$和$RPE_r$产生了一定程度的损失，但是$RPE_t$却达到了最好效果。这一行的结果表明：惯性-车体因子的实时优化对于绝对位置精度和旋转估计有着重要的积极影响，但是对于相对平移估计则有着负面影响。但是综合来看，优化惯性-车体因子对于绝对位置和相对旋转的估计的提升明显，而对于相对位置估计精度的影响有限，因此有保留的必要。
 
-\section{地图定位模块测试}
-地图定位模块的测试在KITTI数据集和4Seasons数据集上进行，本节将分别对两个数据集上的测试结果进行展示。其中KITTI数据集上的测试使用模拟的多趟行驶数据，建图场景和测试场景的变化较小；而4Seasons数据集上的测试使用真实的多趟行驶数据，定位和建图的场景变化较大，具有较强的挑战性。
+\section{地图定位模块与系统整体测试}
+地图定位模块的测试在KITTI数据集和4Seasons数据集上进行，本节将分别对两个数据集上的测试结果进行展示；此外还对模块的各个部分进行了消融实验和效率分析。需要注意的是，由于地图定位模块是系统的最关键部分，其输出等同于系统的最终输出，因此其测试结果也可代表系统整体表现。
 
-\subsection{精度测试}
+\subsection{系统精度测试}
 \subsubsection{KITTI数据集测试}
-在KITTI数据集上，本文的地图定位模块测试结果如图~\ref{fig:loc_kitti} 和表~\ref{tab:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
+
+在KITTI数据集上，本文的地图定位模块测试结果如图~\ref{fig:loc_kitti} 、图~\ref{fig:loc_kitti_cdf} 和表~\ref{tab:loc_kitti} 所示，在表~\ref{tab:loc_kitti} 中以加粗字体和红底标出最佳表现。
 
 \begin{figure}
   \centering
-  \includegraphics[width=1.0\linewidth]{loc_kitti.pdf}
-  \caption{KITTI数据集测试轨迹示意图}
+  \includegraphics[width=0.9\linewidth]{loc_kitti.pdf}
+  \caption{多种定位方法在KITTI数据集上的定位轨迹}
   \label{fig:loc_kitti}
 \end{figure}
 
-对比的方法包括VINS-Fusion(VINS)、VINS-Fusion-Map(VINSM)、ORB-SLAM3(ORB)和ORB-SLAM3-Map(ORBM)进行对比，其中VINS-Fusion-Map和ORB-SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。
+对比的方法包括VINS-Fusion（VINS）、VINS-Fusion-Map（VINSM）、ORB-SLAM3（ORB）和ORB-SLAM3-Map（ORBM）进行对比，其中VINS-Fusion-Map和ORB-SLAM3-Map是VINS-Fusion和ORB-SLAM3的地图版本。
+
+如图~\ref{fig:loc_kitti}所示，本文的方法在图中展示的六个序列中均成功实现了精确的定位轨迹。然而，由于ORB-SLAM3、本文提出的方法与真实轨迹之间几乎完全重合，导致性能对比变得具有挑战性。因此，在图~\ref{fig:loc_kitti_cdf}中进一步展示了累计分布函数（Cumulative Distribution Function, CDF）。除序列05外，在所有序列中，本文的方法在较低的平移误差下迅速达到近乎完整的准确率（CDF接近1），显著优于其他方法，而其他方法则表现出更大的误差。对于序列05，本文的方法在较低的平移误差下也表现出更高的累计概率，进一步证明了其卓越的定位精度。综上所述，CDF曲线所展现出的明显性能差距验证了本文提出方法在精度、鲁棒性和可靠性方面的优势，使其非常适合于高精度、可靠性的视觉定位任务。
+
+从表~\ref{tab:loc_kitti} 中KITTI数据集上多项指标的对比结果来看，不同方法在不同序列上表现存在较大差异。对于绝对轨迹误差$ATE_t$指标，本文方法在序列 00、01、02、05、06、07、08 和 10 上均取得了最低值，说明在绝对位姿精度上具有较明显的优势；仅在序列 04 上，ORB-SLAM3表现更优，而序列 09 的结果略有争议，尽管 VINS 在此处显示出稍低的误差，但总体来看，本文方法在大部分序列中均展现出更好的平稳性。
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.9\linewidth]{loc_kitti_cdf.pdf}
+  \caption{多种定位方法在KITTI数据集上的位移误差CDF曲线}
+  \label{fig:loc_kitti_cdf}
+\end{figure}
+
+对于相对平移误差$RPE_t$而言，各方法的表现相对分散。本文方法在序列 01、02、07 和 08 上表现突出，但在其他序列中，ORB-SLAM3、ORB-SLAM3-Map或其他方法有时能获得更低的误差，表明在平移精度方面，各算法对场景和运动状态的敏感性不同。而在相对旋转误差$RPE_r$方面，本文方法在部分序列，如 00、07、08、09，中取得了较低的值，体现出在角度估计上的一定优势，但在序列 01、02 和 04 上，ORB-SLAM3 或 ORB-SLAM3-Map 的表现更佳，说明在旋转精度上，算法之间仍存在细微差距。
 
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{KITTI数据集多指标对比}
+\caption{多种定位方法在KITTI数据集上的多指标对比}
 \begin{tabular}{lccccccccccc}
 \toprule
 方法    & 指标                    & 00            & 01            & 02            & 04            & 05            & 06            & 07            & 08            & 09            & 10            \\ \midrule
@@ -470,66 +591,133 @@ VINSM &                       & 0.73          & 0.48          & 0.56          & 
 \end{tabular}
 \label{tab:loc_kitti}
 \begin{tablenotes}
-  \item [a] ORB和ORBM分别表示ORB-SLAM3和ORB-SLAM3-Map
-  \item [b] VINS和VINSM分别表示VINS-Fusion和VINS-Fusion-Map
+  \item [a] ORB和ORBM分别表示ORB-SLAM3和ORB-SLAM3-Map。
+  \item [b] VINS和VINSM分别表示VINS-Fusion和VINS-Fusion-Map。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-从表中对KITTI数据集上多项指标的对比结果来看，不同方法在不同序列上表现存在较大差异。对于绝对轨迹误差$ATE_t$指标，本文方法在序列 00、01、02、05、06、07、08 和 10 上均取得了最低值，说明在绝对位姿精度上具有较明显的优势；仅在序列 04 上，ORB-SLAM3表现更优，而序列 09 的结果略有争议，尽管 VINS 在此处显示出稍低的误差，但总体来看，本文方法在大部分序列中均展现出更好的平稳性。
 
-对于相对平移误差$RPE_t$而言，各方法的表现相对分散。本文方法在序列 01、02、07 和 08 上表现突出，但在其他序列中，ORB-SLAM3、ORB-SLAM3-Map或其他方法有时能获得更低的误差，表明在平移精度方面，各算法对场景和运动状态的敏感性不同。
-
-而在相对旋转误差$RPE_r$方面，本文方法在部分序列，如 00、07、08、09，中取得了较低的值，体现出在角度估计上的一定优势，但在序列 01、02 和 04 上，ORB-SLAM3 或 ORB-SLAM3-Map 的表现更佳，说明在旋转精度上，算法之间仍存在细微差距。
-
-综合来看，本文方法在大部分场景下均能保持较高的翻译精度，并在旋转估计上具有竞争力，这表明所提出的算法具有较好的鲁棒性和适应性。
-
-
-\subsubsection{综合(Office Loop)场景测试}
+\subsubsection{综合（Office Loop）场景测试}
 4Seasons数据集实在同一条线路上多次采集获得的，采集的时间跨度从几十分钟到一年，所以其场景相对于KITTI数据集有更多的变化，包括季节、天气、晨昏等。本文首先在Office Loop的一般性场景下进行测试。一般性场景测时的建图序列为2020.03.24 17:36拍摄，而定位序列为2020.03.24 17:45拍摄，两个场景差异较小，因此可以同时比较多个方法的表现。
+
+% \begin{table}
+% \centering
+% \begin{threeparttable}[c]
+% \caption{4Seasons数据集Office Loop场景第2序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                                     & 时间                                                                         & 季节                   & 天气                   & 晨昏                   & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+% 离线建图                                   & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36 \\ (OF1)\end{tabular}                   & 春季                   & 晴朗                   & 下午                   & 0.814881          & 0.929358          & 1.014480          \\ \midrule
+% VINS-Mono                              & \multirow{10}{*}{\begin{tabular}[c]{@{}c@{}}03.24\\ 17:45 \\ (OF2)\end{tabular}} & \multirow{10}{*}{春季} & \multirow{10}{*}{晴朗} & \multirow{10}{*}{下午} & 7.878626          & 2.330876          & 0.783557          \\
+% VINS-Mono w/ Map1                      &                                                                            &                      &                      &                      & 3.092430          & N/A               & N/A               \\
+% VINS-Monow/ Map2                       &                                                                            &                      &                      &                      & 2.440850          & N/A               & N/A               \\
+% ORB-SLAM3                              &                                                                            &                      &                      &                      & 15.621815         & 3.222846          & 0.890233          \\
+% ORB-SLAM3 w/ Map3                      &                                                                            &                      &                      &                      & 19.249121         & N/A               & N/A               \\
+% VINS-Fusion w/  RTK &                                                                            &                      &                      &                      & 1.801669          & 1.500405          & 1.085638          \\
+% VLS                                    &                                                                            &                      &                      &                      & 1.715343          & 1.630718          & \cellcolor[HTML]{FFCCC9}\textbf{0.668220} \\
+% GPLD                                   &                                                                            &                      &                      &                      & 8.720000          & N/A               & N/A               \\
+% MVIL                                   &                                                                            &                      &                      &                      & 6.450000          & N/A               & N/A               \\
+% 本文方法                                   &                                                                            &                      &                      &                      & \cellcolor[HTML]{FFCCC9}\textbf{0.777091} & \cellcolor[HTML]{FFCCC9}\textbf{1.124076} & 0.759267          \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seasons_of2}
+% \begin{tablenotes}
+%   \item [a] Map1表示使用VINS-Mono建图结果
+%   \item [b] Map2表示使用本文离线建图结果
+%   \item [c] Map3表示使用ORB-SLAM3建图结果
+%   \item [d] RTK表示使用了RTK-GPS数据，其定位精度达到厘米级
+% \end{tablenotes}
+% \end{threeparttable}
+% \end{table}
+
+% 测试结果如表~\ref{tab:loc_4seasons_of2} 所示，其中包括了VINS-Mono、VINS-Fusion w/ RTK、ORB-SLAM3、VLS\cite{yang2022real}(2022)、GPLD\cite{hao2023global}(2023)、MVIL\cite{zhang2023map}(2023)等方法与本文方法的对比，其中VINS-Fusion w/ RTK使用了高精度(厘米级)GNSS信号，而VLS、GPLD、MVIL则是近期涌现的三种基于地图的定位方法。
+
+% 首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比。从表~\ref{tab:loc_4seasons_of2} 中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_4seasons_of2} 所示。
+
+% \begin{figure}
+%   \centering
+%   \subcaptionbox{OF1序列建图轨迹\label{fig:loc_4seasons_of1}}{\includegraphics[width=0.47\linewidth]{OF1_zoomin.pdf}}
+%   \subcaptionbox{OF2序列定位轨迹\label{fig:loc_4seasons_of2}}{\includegraphics[width=0.45\linewidth]{OF2_zoomin.pdf}}
+%   \caption{4Seasons数据集定位结果及误差分析}
+%   \label{fig:loc_gnssmap}
+% \end{figure}
+
+
+测试结果如表~\ref{tab:loc_4seasons_of2} 所示，其中包括了VINS-Mono、VINS-Fusion w/ RTK、ORB-SLAM3、VLS\cite{yang2022real}（2022）、GPLD\cite{hao2023global}（2023）、MVIL\cite{zhang2023map}（2023）等方法与本文方法的对比，其中VINS-Fusion w/ RTK使用了高精度（厘米级）GNSS信号，而VLS、GPLD、MVIL则是近期涌现的三种基于地图的定位方法。
 
 \begin{table}
 \centering
 \begin{threeparttable}[c]
-\caption{4Seasons数据集Office Loop场景第2序列指标对比}
+\caption{多种定位方法在OF2序列上的多指标对比}
+\setlength{\tabcolsep}{2.65mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                                     & 时间                                                                         & 季节                   & 天气                   & 晨昏                   & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
-离线建图                                   & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36 \\ (OF1)\end{tabular}                   & 春季                   & 晴朗                   & 下午                   & 0.814881          & 0.929358          & 1.014480          \\ \midrule
-VINS-Mono                              & \multirow{10}{*}{\begin{tabular}[c]{@{}c@{}}03.24\\ 17:45 \\ (OF2)\end{tabular}} & \multirow{10}{*}{春季} & \multirow{10}{*}{晴朗} & \multirow{10}{*}{下午} & 7.878626          & 2.330876          & 0.783557          \\
-VINS-Mono w/ Map1                      &                                                                            &                      &                      &                      & 3.092430          & N/A               & N/A               \\
-VINS-Monow/ Map2                       &                                                                            &                      &                      &                      & 2.440850          & N/A               & N/A               \\
-ORB-SLAM3                              &                                                                            &                      &                      &                      & 15.621815         & 3.222846          & 0.890233          \\
-ORB-SLAM3 w/ Map3                      &                                                                            &                      &                      &                      & 19.249121         & N/A               & N/A               \\
-VINS-Fusion w/  RTK &                                                                            &                      &                      &                      & 1.801669          & 1.500405          & 1.085638          \\
-VLS                                    &                                                                            &                      &                      &                      & 1.715343          & 1.630718          & \cellcolor[HTML]{FFCCC9}\textbf{0.668220} \\
-GPLD                                   &                                                                            &                      &                      &                      & 8.720000          & N/A               & N/A               \\
-MVIL                                   &                                                                            &                      &                      &                      & 6.450000          & N/A               & N/A               \\
-本文方法                                   &                                                                            &                      &                      &                      & \cellcolor[HTML]{FFCCC9}\textbf{0.777091} & \cellcolor[HTML]{FFCCC9}\textbf{1.124076} & 0.759267          \\ \bottomrule
-\end{tabular}
+离线建图                                   & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36 \\ （OF1）\end{tabular}                   & 春季                   & 晴朗                   & 下午                   & 0.81          & 0.92          & 1.01          \\ \midrule
+VINS-Mono                              & \multirow{10}{*}{\begin{tabular}[c]{@{}c@{}}03.24\\ 17:45 \\ （OF2）\end{tabular}} & \multirow{10}{*}{春季} & \multirow{10}{*}{晴朗} & \multirow{10}{*}{下午} & 7.87          & 2.33          & 0.78          \\
+VINS-Mono w/ Map1                      &                                                                            &                      &                      &                      & 3.09          & N/A               & N/A               \\
+VINS-Monow/ Map2                       &                                                                            &                      &                      &                      & 2.44          & N/A               & N/A               \\
+ORB-SLAM3                              &                                                                            &                      &                      &                      & 15.62         & 3.22          & 0.89          \\
+ORB-SLAM3 w/ Map3                      &                                                                            &                      &                      &                      & 19.24         & N/A               & N/A               \\
+VINS-Fusion w/  RTK &                                                                            &                      &                      &                      & 1.80          & 1.50          & 1.08          \\
+VLS                                    &                                                                            &                      &                      &                      & 1.71          & 1.63          & \cellcolor[HTML]{FFCCC9}\textbf{0.66} \\
+GPLD                                   &                                                                            &                      &                      &                      & 8.72          & N/A               & N/A               \\
+MVIL                                   &                                                                            &                      &                      &                      & 6.45          & N/A               & N/A               \\
+本文方法                                   &                                                                            &                      &                      &                      & \cellcolor[HTML]{FFCCC9}\textbf{0.77} & \cellcolor[HTML]{FFCCC9}\textbf{1.12} & 0.75          \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seasons_of2}
 \begin{tablenotes}
-  \item [a] Map1表示使用VINS-Mono建图结果
-  \item [b] Map2表示使用本文离线建图结果
-  \item [c] Map3表示使用ORB-SLAM3建图结果
-  \item [d] RTK表示使用了RTK-GPS数据，其定位精度达到厘米级
+  \item [a] Map1表示使用VINS-Mono建图结果。
+  \item [b] Map2表示使用本文离线建图结果。
+  \item [c] Map3表示使用ORB-SLAM3建图结果。
+  \item [d] RTK表示使用了RTK-GNSS数据，其定位精度达到厘米级。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-测试结果如表~\ref{tab:loc_4seasons_of2} 所示，其中包括了VINS-Mono、VINS-Fusion w/ RTK、ORB-SLAM3、VLS\cite{yang2022real}(2022)、GPLD\cite{hao2023global}(2023)、MVIL\cite{zhang2023map}(2023)等方法与本文方法的对比，其中VINS-Fusion w/ RTK使用了高精度(厘米级)GNSS信号，而VLS、GPLD、MVIL则是近期涌现的三种基于地图的定位方法。
-
-首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比。从表~\ref{tab:loc_4seasons_of2} 中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_4seasons_of2} 所示。
+首先在OF1和OF2两个序列上进行实验，这两个序列由于拍摄时间接近，所以场景变化不大，因此在其中进行的实验还包括了VINS-Mono w/ Map1、VINS-Mono w/ Map2、ORB-SLAM3 w/ Map3等方法的对比。从表~\ref{tab:loc_4seasons_of2} 中可以看出，本文方法在$ATE_t$和$RPE_t$上均取得了最佳表现，而在$RPE_r$上略逊于VLS方法，此外本文方法是第一个将定位精度提升到1米以内的方法，本文将其在卫星图上的定位结果展示如图~\ref{fig:loc_gnssmap} 的子图~\ref{fig:loc_4seasons_of2} 所示。
 
 \begin{figure}
   \centering
   \subcaptionbox{OF1序列建图轨迹\label{fig:loc_4seasons_of1}}{\includegraphics[width=0.47\linewidth]{OF1_zoomin.pdf}}
   \subcaptionbox{OF2序列定位轨迹\label{fig:loc_4seasons_of2}}{\includegraphics[width=0.45\linewidth]{OF2_zoomin.pdf}}
-  \caption{4Seasons数据集定位结果及误差分析}
+  \caption{本文系统在OF1序列上的建图轨迹与OF2序列上定位轨迹}
   \label{fig:loc_gnssmap}
 \end{figure}
 
 在图~\ref{fig:loc_4seasons_of2} 中可以看到在放大区域有着明显的定位误差，但这并非由于定位方法引入，而是由建图误差引入：如图~\ref{fig:loc_4seasons_of1} 所示，可以看到在定位误差较大的区域，建图时本身就存在明显的偏差，这导致了定位过程中引入了这一误差。因此，本文的定位方法在4Seasons数据集上的表现是受到了建图质量的影响，但是相较于其他方法，本文的定位方法在相同的建图条件下取得了更好的定位精度。
+
+在Office Loop的环境下还有更多的具有挑战性的序列，本文在这些序列上也进行了测试。这些序列包括了OF3、OF4和OF5，具体的场景变化如图~\ref{fig:scene_of} 所示，这些序列的场景相较于OF2，有了晨昏~\ref{fig:scene_of3}，季节~\ref{fig:scene_of4}，天气~\ref{fig:scene_of5} 的变化。定位的结果如表~\ref{tab:loc_4seasons_of345} 所示，需要说明的是，由于从OF3开始场景出现了较大的变化，因此一些使用传统方法的地图定位方法无法再依靠地图信息运行，因此此处仅汇报了可以运行的方法。
+
+% \begin{table}
+% \centering
+% \caption{4Seasons数据集Office Loop场景部分序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$               & $RPE_t$              & $RPE_r$              \\ \midrule
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36\\ (OF1)\end{tabular}                  & 春季                  & 晴朗                  & 下午                  & 0.814881          & 0.929358          & 1.014480          \\ \midrule
+% VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}04.07\\ 10:20\\ (OF3)\end{tabular}} & \multirow{5}{*}{春季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 10.664015         & 5.305404          & 5.305404          \\
+% ORB-SLAM3          &                                                                                &                     &                     &                     & 6.288431          & 5.000592          & 5.000592          \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.000104          & 3.678773          & 3.678773          \\
+% VLS                &                                                                                &                     &                     &                     & 2.913034          & 3.978592          & 3.519618 \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.938238} & \cellcolor[HTML]{FFCCC9}\textbf{2.947031} & \cellcolor[HTML]{FFCCC9}\textbf{2.529328} \\ \midrule
+% VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}06.12\\ 10:10\\ (OF4)\end{tabular}} & \multirow{5}{*}{夏季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 7.661955          & 3.447067          & 1.747575          \\
+% ORB-SLAM3          &                                                                                &                     &                     &                     & 5.073350          & 3.207118          & 1.760357          \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.809687          & 2.158715          & 1.577418          \\
+% VLS                &                                                                                &                     &                     &                     & 4.515426          & 8.142403          & 2.389229          \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.792201} & \cellcolor[HTML]{FFCCC9}\textbf{1.402346} & \cellcolor[HTML]{FFCCC9}\textbf{1.047381} \\ \midrule
+% VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 12:04\\ (OF5)\end{tabular}} & \multirow{5}{*}{冬季} & \multirow{5}{*}{降雪} & \multirow{5}{*}{下午} & 8.083566          & 2.598062          & \cellcolor[HTML]{FFCCC9}\textbf{0.990526} \\
+% ORB-SLAM3          &                                                                                &                     &                     &                     & 5.520636          & 1.878826          & 1.000615          \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.448607          & 1.333865          & 0.934714          \\
+% VLS                &                                                                                &                     &                     &                     & 1.862401          & 1.835533          & 0.999361          \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.767040} & \cellcolor[HTML]{FFCCC9}\textbf{1.251208} & 0.999785          \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seasons_of345}
+% \end{table}
+
+具体分析此场景下的不同序列可以看出，OF3和OF1两个序列的分别是在下午和清晨拍摄，所以图片中的光照强度首先就有一定的不同，此外图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of3}中道路的车况也有一定区别，在图~\ref{fig:scene_of3} 中出现了建图过程未出现的车辆，为定位的细粒度特征匹配增加了较大困难。
+
+OF4和OF1两个序列存在季节的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of4} 中可以看到，OF4中的场景中出现了更繁茂的植被，甚至遮盖了部分建筑物，这对于细粒度特征匹配和定位都带来了一定的困难。OF5和OF1两个序列存在天气的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of5} 中可以看到，OF5中的场景中出现了降雪，改变了整个场景的整体感知条件，这对于定位的粗粒度和细粒度匹配都带来的挑战。
 
 \begin{figure}
   \centering
@@ -546,104 +734,155 @@ MVIL                                   &                                        
   \label{fig:scene_of}
 \end{figure}
 
-在Office Loop的环境下还有更多的具有挑战性的序列，本文在这些序列上也进行了测试。这些序列包括了OF3、OF4和OF5，具体的场景变化如图~\ref{fig:scene_of} 所示，这些序列的场景相较于OF2，有了晨昏~\ref{fig:scene_of3}，季节~\ref{fig:scene_of4}和~\ref{fig:scene_of5}，天气~\ref{fig:scene_of5} 的变化。定位的结果如表~\ref{tab:loc_4seasons_of345} 所示，需要说明的是，由于从OF3开始场景出现了较大的变化，因此一些使用传统方法的地图定位方法无法再依靠地图信息运行，因此此处仅汇报了可以运行的方法。
+从表~\ref{tab:loc_4seasons_of345} 中的信息可以看出：本文方法在所有序列的$ATE_t$和$RPE_t$指标上均取得了明显的优势，是所有方法中唯一误差稳定在1米以内的方法；在OF5上的$RPE_r$指标上略逊于VINS-Fusion方法，但是差距极小。
 
 \begin{table}
 \centering
-\caption{4Seasons数据集Office Loop场景部分序列指标对比}
+\caption{多种定位方法在OF3-5序列上的多指标对比}
+\setlength{\tabcolsep}{3.2mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$               & $RPE_t$              & $RPE_r$              \\ \midrule
-离线建图               & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36\\ (OF1)\end{tabular}                  & 春季                  & 晴朗                  & 下午                  & 0.814881          & 0.929358          & 1.014480          \\ \midrule
-VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}04.07\\ 10:20\\ (OF3)\end{tabular}} & \multirow{5}{*}{春季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 10.664015         & 5.305404          & 5.305404          \\
-ORB-SLAM3          &                                                                                &                     &                     &                     & 6.288431          & 5.000592          & 5.000592          \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.000104          & 3.678773          & 3.678773          \\
-VLS                &                                                                                &                     &                     &                     & 2.913034          & 3.978592          & 3.519618 \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.938238} & \cellcolor[HTML]{FFCCC9}\textbf{2.947031} & \cellcolor[HTML]{FFCCC9}\textbf{2.529328} \\ \midrule
-VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}06.12\\ 10:10\\ (OF4)\end{tabular}} & \multirow{5}{*}{夏季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 7.661955          & 3.447067          & 1.747575          \\
-ORB-SLAM3          &                                                                                &                     &                     &                     & 5.073350          & 3.207118          & 1.760357          \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.809687          & 2.158715          & 1.577418          \\
-VLS                &                                                                                &                     &                     &                     & 4.515426          & 8.142403          & 2.389229          \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.792201} & \cellcolor[HTML]{FFCCC9}\textbf{1.402346} & \cellcolor[HTML]{FFCCC9}\textbf{1.047381} \\ \midrule
-VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 12:04\\ (OF5)\end{tabular}} & \multirow{5}{*}{冬季} & \multirow{5}{*}{降雪} & \multirow{5}{*}{下午} & 8.083566          & 2.598062          & \cellcolor[HTML]{FFCCC9}\textbf{0.990526} \\
-ORB-SLAM3          &                                                                                &                     &                     &                     & 5.520636          & 1.878826          & 1.000615          \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.448607          & 1.333865          & 0.934714          \\
-VLS                &                                                                                &                     &                     &                     & 1.862401          & 1.835533          & 0.999361          \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.767040} & \cellcolor[HTML]{FFCCC9}\textbf{1.251208} & 0.999785          \\ \bottomrule
-\end{tabular}
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}03.24\\ 17:36\\ (OF1)\end{tabular}                  & 春季                  & 晴朗                  & 下午                  & 0.81          & 0.92          & 1.01          \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}04.07\\ 10:20\\ （OF3）\end{tabular}} & \multirow{5}{*}{春季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 10.66         & 5.30          & 5.30          \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 6.28          & 5.00          & 5.00          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.00          & 3.67          & 3.67          \\
+VLS                &                                                                                &                     &                     &                     & 2.91          & 3.97          & 3.51 \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.93} & \cellcolor[HTML]{FFCCC9}\textbf{2.94} & \cellcolor[HTML]{FFCCC9}\textbf{2.52} \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}06.12\\ 10:10\\（OF4）\end{tabular}} & \multirow{5}{*}{夏季} & \multirow{5}{*}{晴朗} & \multirow{5}{*}{清晨} & 7.66          & 3.44          & 1.74          \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 5.07          & 3.20          & 1.76          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.80          & 2.15          & 1.57          \\
+VLS                &                                                                                &                     &                     &                     & 4.51          & 8.14          & 2.38          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.79} & \cellcolor[HTML]{FFCCC9}\textbf{1.40} & \cellcolor[HTML]{FFCCC9}\textbf{1.04} \\ \midrule
+VINS-Mono          & \multirow{5}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 12:04\\ （OF5）\end{tabular}} & \multirow{5}{*}{冬季} & \multirow{5}{*}{降雪} & \multirow{5}{*}{下午} & 8.08          & 2.59          & 0.99 \\
+ORB-SLAM3          &                                                                                &                     &                     &                     & 5.52          & 1.87          & 1.00          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 2.44          & 1.33          & \cellcolor[HTML]{FFCCC9}\textbf{0.93}          \\
+VLS                &                                                                                &                     &                     &                     & 1.86          & 1.83          & 0.99          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.76} & \cellcolor[HTML]{FFCCC9}\textbf{1.25} & 0.99          \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seasons_of345}
 \end{table}
 
-具体分析此场景下的不同序列可以看出，OF3和OF1两个序列的分别是在下午和清晨拍摄，所以图片中的光照强度首先就有一定的不同，此外图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of3}中道路的车况也有一定区别，在图~\ref{fig:scene_of3} 中出现了建图过程未出现的车辆，为定位的细粒度特征匹配增加了较大困难。OF4和OF1两个序列存在季节的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of4} 中可以看到，OF4中的场景中出现了更繁茂的植被，甚至遮盖了部分建筑物，这对于细粒度特征匹配和定位都带来了一定的困难。OF5和OF1两个序列存在天气的变化，从图~\ref{fig:scene_of1} 和图~\ref{fig:scene_of5} 中可以看到，OF5中的场景中出现了降雪，改变了整个场景的整体感知条件，这对于定位的粗粒度和细粒度匹配都带来的挑战。
-
-从表中信息可以看出：本文方法在所有序列的$ATE_t$和$RPE_t$指标上均取得了明显的优势，是所有方法中唯一误差稳定在1米以内的方法；在OF5上的$RPE_r$指标上略逊于VLS方法，但是差距极小。
-
 在表~\ref{tab:loc_4seasons_of2} 和表~\ref{tab:loc_4seasons_of345} 中还可以发现本文方法在地图本身具有误差的情况下，定位结果却出现了部分超越地图精度的情况。这一现象结合后文的消融实验可以看到本文将地图建模为概率地图的做法具有一定作用：在地图中引入了不确定性后，紧耦合优化可以更好地利用地图信息，从而提升定位精度。
 
+为了更加直观得展示出定位的细节，本节还展示了在OF5序列上的粗粒度匹配与细粒度匹配结果：在OF5的定位序列中选择了4个具有代表性的位置进行展示，4个位置在轨迹上的分布以及各自的匹配结果展示，如图~\ref{fig:loc_4seasons_of5_details} 所示。粗粒度匹配的结果以图像对的形式展示：对比中将待定位的图像（上）与匹配的地图关键帧（下）进行了拼接，以探究粗粒度匹配的图像是否具有合理的共视关系。细粒度匹配的结果以特征点连线的形式展示：在粗粒度匹配图像的基础上，将图像中匹配的特征点进行了连线。粗粒度和细粒度匹配的结果可以表明：本文所使用的粗到细匹配方法在实际应用中有着良好的表现，即使在OF5序列中存在降雪的情况下，本文方法依然可以在粗粒度匹配中找到合理的共视关系，并且在细粒度匹配中也能找到足够的特征点进行匹配。
 
-\subsubsection{低结构化(Neighborhood)场景测试}
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\linewidth]{localization_details.png}
+  \caption{OF5序列上的粗粒度匹配与细粒度匹配结果}
+  \label{fig:loc_4seasons_of5_details}
+\end{figure}
 
 
-Neighborhood场景中有更多的植被，接近于农村环境，因此在这个场景下的测试能表现出本文方法在较低纹理环境下的表现。在此场景下又增加了几种Office Loop场景中没有出现的条件，例如降雨天气(NH3)和傍晚环境(NH7)。测试结果如表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47}所示。
+\subsubsection{低结构化（Neighborhood）场景测试}
+
+Neighborhood场景中有更多的植被，接近于农村环境，因此在这个场景下的测试能表现出本文方法在较低纹理环境下的表现。在此场景下又增加了几种Office Loop场景中没有出现的条件，例如降雨天气（NH3）和傍晚环境（NH7），如图~\ref{fig:scene_nh} 所示。测试结果如表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47} 所示。
+
+\begin{figure}
+\centering
+\subcaptionbox{NH3序列降雨场景\label{fig:scene_nh3}}{\includegraphics[width=0.48\linewidth]{Neighborhood3.png}}
+\subcaptionbox{NH7序列傍晚场景\label{fig:scene_nh7}}{\includegraphics[width=0.48\linewidth]{Neighborhood7.png}}
+\caption{4Seasons数据集NH3与NH7场景差异展示}
+\label{fig:scene_nh}
+\end{figure}
+
+% \begin{table}
+% \centering
+% \caption{4Seasons数据集Neighborhood场景第2与第3序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ (NH1)\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.133943          & 0.400299          & 0.451671          \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:47\\ (NH2)\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{多云} & \multirow{4}{*}{下午} & 3.896760          & 1.177058          & \cellcolor[HTML]{FFCCC9}\textbf{0.957432} \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.584860          & 2.081065          & 1.764747          \\
+% VLS                &                                                                                &                     &                     &                     & 0.385877          & \cellcolor[HTML]{FFCCC9}\textbf{1.015101}          & 1.005846 \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.325610} & 1.079635 & 1.022361          \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:53\\ (NH3)\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{降雨} & \multirow{4}{*}{下午} & 1.074461          & 1.193234          & \cellcolor[HTML]{FFCCC9}\textbf{0.980104} \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.557219          & 1.922972          & 1.199615          \\
+% VLS                &                                                                                &                     &                     &                     & 0.338285          & 1.033000          & 1.002556          \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.323113} & \cellcolor[HTML]{FFCCC9}\textbf{1.006227} & 1.006227          \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seasons_nh23}
+% \end{table}
+
+降雨条件和傍晚条件的感知条件如图~\ref{fig:scene_nh} 所示，左图的降雨条件可以看到明显的水雾出现在图像上，而右图的傍晚环境，可以看到明显的亮度降低。在这种条件下本文方法依旧在所有序列的$ATE_t$和$RPE_t$指标上取得了最好的效果，如表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47} 所示；虽然在$RPE_r$依旧没有比其他方法有明显优势，但是所有方法在该指标上的差距都非常小，更进一步展示了本文方法对环境的适应性强。
 
 \begin{table}
 \centering
-\caption{4Seasons数据集Neighborhood场景第2与第3序列指标对比}
+\caption{多种定位方法在NH2与NH3序列上的多指标对比}
+\setlength{\tabcolsep}{2.75mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
-离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ (NH1)\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.133943          & 0.400299          & 0.451671          \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:47\\ (NH2)\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{多云} & \multirow{4}{*}{下午} & 3.896760          & 1.177058          & \cellcolor[HTML]{FFCCC9}\textbf{0.957432} \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.584860          & 2.081065          & 1.764747          \\
-VLS                &                                                                                &                     &                     &                     & 0.385877          & \cellcolor[HTML]{FFCCC9}\textbf{1.015101}          & 1.005846 \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.325610} & 1.079635 & 1.022361          \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:53\\ (NH3)\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{降雨} & \multirow{4}{*}{下午} & 1.074461          & 1.193234          & \cellcolor[HTML]{FFCCC9}\textbf{0.980104} \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.557219          & 1.922972          & 1.199615          \\
-VLS                &                                                                                &                     &                     &                     & 0.338285          & 1.033000          & 1.002556          \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.323113} & \cellcolor[HTML]{FFCCC9}\textbf{1.006227} & 1.006227          \\ \bottomrule
-\end{tabular}
+离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ （NH1）\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.13          & 0.40          & 0.45          \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:47\\ （NH2）\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{多云} & \multirow{4}{*}{下午} & 3.89          & 1.17          & \cellcolor[HTML]{FFCCC9}\textbf{0.95} \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.58          & 2.08          & 1.76          \\
+VLS                &                                                                                &                     &                     &                     & 0.38          & \cellcolor[HTML]{FFCCC9}\textbf{1.01}          & 1.00 \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.32} & 1.07 & 1.02          \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}10.07\\ 14:53\\ （NH3）\end{tabular}} & \multirow{4}{*}{秋季} & \multirow{4}{*}{降雨} & \multirow{4}{*}{下午} & 1.07          & 1.19          & \cellcolor[HTML]{FFCCC9}\textbf{0.98} \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.55          & 1.92          & 1.19          \\
+VLS                &                                                                                &                     &                     &                     & 0.33          & 1.03          & 1.00          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.32} & \cellcolor[HTML]{FFCCC9}\textbf{1.00} & 1.00          \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seasons_nh23}
 \end{table}
 
-降雨条件和傍晚条件的感知条件如图~\ref{fig:scene_nh} 所示，左图的降雨条件可以看到明显的水雾出现在图像上，而右图的傍晚环境，可以看到明显的亮度降低。在这种条件下本文方法依旧在所有序列的$ATE_t$和$RPE_t$指标上取得了最好的效果；虽然在$RPE_r$依旧没有比其他方法有明显优势，但是所有方法在该指标上的差距都非常小，更进一步展示了本文方法对环境的适应性。
-
-\begin{figure}
-  \centering
-  \subcaptionbox*{NH3序列降雨场景\label{fig:scene_nh3}}{\includegraphics[width=0.32\linewidth]{Neighborhood3.png}}
-  \subcaptionbox*{NH7序列傍晚场景\label{fig:scene_nh7}}{\includegraphics[width=0.32\linewidth]{Neighborhood7.png}}
-  \caption{4Seasons数据集NH3与NH7场景差异展示}
-  \label{fig:scene_nh}
-\end{figure}
-
 在此场景下由于离线建图的精度较高，因此本文方法在定位过程中能够更好地利用地图信息，从而提升定位精度，$ATE_t$指标下都获得了30厘米左右的误差，已经达到了厘米级的定位精度。但是此场景下，本文定位方法并没有出现超越地图精度的情况，这主要是受限于本文定位方法的精度上限，这一上限也将在后文的消融实验中进行验证。
+
+% \begin{table}
+% \centering
+% \caption{4Seasons数据集Neighborhood场景第4与第7序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ (NH1)\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.133943          & 0.400299          & 0.451671          \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}12.22\\ 11:54\\ (NH4)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{多云} & \multirow{4}{*}{清晨} & 3.326053          & 1.721227          & 1.014069          \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.584881          & 1.273095          & 1.337608          \\
+% VLS                &                                                                                &                     &                     &                     & 0.336795          & 0.828517          & \cellcolor[HTML]{FFCCC9}\textbf{0.722960} \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.303237} & \cellcolor[HTML]{FFCCC9}\textbf{0.787774} & 0.793884          \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}05.10\\ 18:32\\ (NH7)\end{tabular}} & \multirow{4}{*}{春季} & \multirow{4}{*}{多云} & \multirow{4}{*}{傍晚} & 1.770878          & 1.461675          & 1.239126          \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.098182          & 3.455674          & 2.230523          \\
+% VLS                &                                                                                &                     &                     &                     & 0.304587          & 1.125579          & 1.007488          \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.291957} & \cellcolor[HTML]{FFCCC9}\textbf{1.033805} & \cellcolor[HTML]{FFCCC9}\textbf{1.007318} \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seasons_nh47}
+% \end{table}
 
 \begin{table}
 \centering
-\caption{4Seasons数据集Neighborhood场景第4与第7序列指标对比}
+\caption{多种定位方法在NH4与NH7序列上的多指标对比}
+\setlength{\tabcolsep}{2.75mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
-离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ (NH1)\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.133943          & 0.400299          & 0.451671          \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}12.22\\ 11:54\\ (NH4)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{多云} & \multirow{4}{*}{清晨} & 3.326053          & 1.721227          & 1.014069          \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.584881          & 1.273095          & 1.337608          \\
-VLS                &                                                                                &                     &                     &                     & 0.336795          & 0.828517          & \cellcolor[HTML]{FFCCC9}\textbf{0.722960} \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.303237} & \cellcolor[HTML]{FFCCC9}\textbf{0.787774} & 0.793884          \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}05.10\\ 18:32\\ (NH7)\end{tabular}} & \multirow{4}{*}{春季} & \multirow{4}{*}{多云} & \multirow{4}{*}{傍晚} & 1.770878          & 1.461675          & 1.239126          \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.098182          & 3.455674          & 2.230523          \\
-VLS                &                                                                                &                     &                     &                     & 0.304587          & 1.125579          & 1.007488          \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.291957} & \cellcolor[HTML]{FFCCC9}\textbf{1.033805} & \cellcolor[HTML]{FFCCC9}\textbf{1.007318} \\ \bottomrule
-\end{tabular}
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}03.26\\ 13:32\\ (NH1)\end{tabular}                  & 春季                  & 多云                  & 下午                  & 0.13          & 0.40          & 0.45          \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}12.22\\ 11:54\\ （NH4）\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{多云} & \multirow{4}{*}{清晨} & 3.3          & 1.72          & 1.01          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.58          & 1.27          & 1.33          \\
+VLS                &                                                                                &                     &                     &                     & 0.33          & 0.82          & \cellcolor[HTML]{FFCCC9}\textbf{0.72} \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.30} & \cellcolor[HTML]{FFCCC9}\textbf{0.78} & 0.79          \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}05.10\\ 18:32\\ （NH7）\end{tabular}} & \multirow{4}{*}{春季} & \multirow{4}{*}{多云} & \multirow{4}{*}{傍晚} & 1.77          & 1.46          & 1.23          \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.09          & 3.45          & 2.23          \\
+VLS                &                                                                                &                     &                     &                     & 0.30          & 1.12          & \cellcolor[HTML]{FFCCC9}\textbf{1.00}          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.29} & \cellcolor[HTML]{FFCCC9}\textbf{1.03} & \cellcolor[HTML]{FFCCC9}\textbf{1.00} \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seasons_nh47}
 \end{table}
 
-由于NH5和NH6所代表的场景已经出现在了表~\ref{tab:loc_4seasons_nh23} 和表~\ref{tab:loc_4seasons_nh47} 中，因此不再重复描述其具体数值，而是以$APE_t$的云雨图~\ref{fig:loc_4seaons_nh5} 形式展示不同方法的定位结果。云雨图图中展示了不同方法在NH5和NH6两个序列上的定位误差分布，三条横线由高到低分别表示“最大值”，“中位数”和“最小值”，可以看到本文方法在这两个序列上的定位误差分布更加集中，且中位数更低，这说明本文方法在这两个序列上的定位精度更高且更稳定。
+由于NH5和NH6所代表的环境已经在其他序列中出现，因此不再重复汇报其具体数值，而是以位移误差的云雨图~\ref{fig:loc_4seaons_nh5} 与云雨图~\ref{fig:loc_4seaons_nh6} 形式展示不同方法的定位结果。云雨图由小提琴图、箱线图、抖动散点图组合而成，展示了不同方法在NH5和NH6两个序列上的定位误差分布。可以看到本文方法在这两个序列上的定位误差分布更加集中，且中位数更低，这说明本文方法在这两个序列上的定位精度更高且更稳定。
 
 \begin{figure}
   \centering
-  \includegraphics[width=0.8\linewidth]{loc_NH5_cloud.png}
-  \includegraphics[width=0.8\linewidth]{loc_NH6_cloud.png}
-  \caption{不同定位方法在OF5(上)和OF6(下)序列上的定位误差分布}
+  \includegraphics[width=0.9\linewidth]{loc_NH5_cloud.png}
+  \caption{多种定位方法在NH5序列上的定位误差分布}
   \label{fig:loc_4seaons_nh5}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.9\linewidth]{loc_NH6_cloud.png}
+  \caption{多种定位方法在NH6序列上的定位误差分布}
+  \label{fig:loc_4seaons_nh6}
 \end{figure}
 
 % \begin{figure}
@@ -653,7 +892,7 @@ VLS                &                                                            
 %   \label{fig:loc_4seaons_nh6}
 % \end{figure}
 
-\subsubsection{复杂(Business Campus与Old Town)场景测试}
+\subsubsection{复杂（Business Campus与Old Town）场景测试}
 
 Business Campus场景在校园环境中，Old Town场景在城市中心区，这两个场景的有着更多的建筑物和道路，但也有着更多的移动物体和复杂的动态场景，如图~\ref{fig:scene_bc2} 和图~\ref{fig:scene_ot2} 所示，因此在这个场景下的测试能够更好地表现出本文方法在复杂环境下的表现。此外，在场景感知条件变化方面，这两个场景也覆盖了多种季节和天气条件，在Old Twon的建图序列中还有降雨天气，如图~\ref{fig:scene_ot1} 所示，也可以反映出本文方法在较差天气建图条件下的定位表现。
 
@@ -668,39 +907,75 @@ Business Campus场景在校园环境中，Old Town场景在城市中心区，这
 
 在两个场景下的对比如表~\ref{tab:loc_4seaons_bc56} 和表~\ref{tab:loc_4seaons_ot2} 所示，需要注意的是，由于Business Campus场景中的建图轨迹在进行$RPE_t$和$RPE_r$指标计算的时候，对齐过程数值不稳定产生了不合理结果，因此表中只给出了建图轨迹的$ATE_t$指标，可以看到该指标非常小，足以说明建图轨迹较为精确，因此另外两个指标的缺失也是可以接受的。本文方法依旧在$ATE_t$和$RPE_t$上取得了最佳表现，但是在$RPE_r$上表现不够稳定，但是与其他方法差距非常小。此外，在这两个场景下，本文方法在定位精度上依旧取得了1米以内的误差，这不仅说明本文方法在复杂场景下的表现优秀，也说明了本文方法具有较强的稳定性。
 
+% \begin{table}
+% \centering
+% \caption{4Seasons数据集Business Campus场景部分序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\ 09:30\\ (BC1)\end{tabular}                  & 秋季                  & 晴朗                  & 清晨                  & 0.095337          & N/A               & N/A               \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 13:12\\ (BC2)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{降雪} & \multirow{4}{*}{下午} & 7.376041          & 1.668179          & \cellcolor[HTML]{FFCCC9}\textbf{1.313357} \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.115755          & 2.313352          & 2.588801          \\
+% VLS                &                                                                                &                     &                     &                     & 1.092215          & 1.938506          & 1.367412 \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.639282} & \cellcolor[HTML]{FFCCC9}\textbf{1.576658} & 1.385713          \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\ 14:16\\ (BC3)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{下午} & 7.372700          & 1.760015          & 1.202648 \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.076147          & 2.596570          & 2.926574          \\
+% VLS                &                                                                                &                     &                     &                     & 0.495447          & 2.025172          & 1.786391          \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.446566} & \cellcolor[HTML]{FFCCC9}\textbf{1.380626} & \cellcolor[HTML]{FFCCC9}\textbf{1.109240}          \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seaons_bc56}
+% \end{table}
+
 \begin{table}
 \centering
-\caption{4Seasons数据集Business Campus场景部分序列指标对比}
+\caption{多种定位方法在Business Campus场景中的多指标对比}
+\setlength{\tabcolsep}{2.75mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
-离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\ 09:30\\ (BC1)\end{tabular}                  & 秋季                  & 晴朗                  & 清晨                  & 0.095337          & N/A               & N/A               \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 13:12\\ (BC2)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{降雪} & \multirow{4}{*}{下午} & 7.376041          & 1.668179          & \cellcolor[HTML]{FFCCC9}\textbf{1.313357} \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.115755          & 2.313352          & 2.588801          \\
-VLS                &                                                                                &                     &                     &                     & 1.092215          & 1.938506          & 1.367412 \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.639282} & \cellcolor[HTML]{FFCCC9}\textbf{1.576658} & 1.385713          \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\ 14:16\\ (BC3)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{下午} & 7.372700          & 1.760015          & 1.202648 \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.076147          & 2.596570          & 2.926574          \\
-VLS                &                                                                                &                     &                     &                     & 0.495447          & 2.025172          & 1.786391          \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.446566} & \cellcolor[HTML]{FFCCC9}\textbf{1.380626} & \cellcolor[HTML]{FFCCC9}\textbf{1.109240}          \\ \bottomrule
-\end{tabular}
+离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\ 09:30\\ （BC1）\end{tabular}                  & 秋季                  & 晴朗                  & 清晨                  & 0.09          & N/A               & N/A               \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}01.07\\ 13:12\\ （BC2）\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{降雪} & \multirow{4}{*}{下午} & 7.37          & 1.66          & \cellcolor[HTML]{FFCCC9}\textbf{1.31} \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.11          & 2.31          & 2.58          \\
+VLS                &                                                                                &                     &                     &                     & 1.09          & 1.93          & 1.36 \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.63} & \cellcolor[HTML]{FFCCC9}\textbf{1.57} & 1.38          \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\ 14:16\\ （BC3）\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{下午} & 7.37          & 1.76          & 1.20 \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 1.07          & 2.59          & 2.92          \\
+VLS                &                                                                                &                     &                     &                     & 0.49          & 2.02          & 1.78          \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.44} & \cellcolor[HTML]{FFCCC9}\textbf{1.38} & \cellcolor[HTML]{FFCCC9}\textbf{1.10}          \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seaons_bc56}
 \end{table}
 
 在Business Campus场景中，由于离线建图模块的精度较高，因此本文方法在定位过程中能够更好地利用地图信息，从而提升定位精度，$ATE_t$指标下都获得了50厘米左右的误差，已经有了较高的定位精度。
 
+% \begin{table}
+% \centering
+% \caption{4Seasons数据集Old Town场景第2序列指标对比}
+% \begin{tabular}{lccccccc}
+% \toprule
+% 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
+% 离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\11:53\\(OT1)\end{tabular}                  & 冬季                  & 降雨                  & 清晨                  & 1.016104          & 0.456781               & 1.116236               \\ \midrule
+% ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\12:24\\(OT2)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{清晨} & 38.930786         & 4.441040          & \cellcolor[HTML]{FFCCC9}\textbf{1.078154} \\
+% VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.965686          & 2.682027          & 1.172853          \\
+% VLS                &                                                                                &                     &                     &                     & 1.143163          & 2.318242          & 1.443211 \\
+% 本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.846396} & \cellcolor[HTML]{FFCCC9}\textbf{2.318242} & 1.521039          \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_4seaons_ot2}
+% \end{table}
+
 \begin{table}
 \centering
-\caption{4Seasons数据集Old Town场景第2序列指标对比}
+\caption{多种定位方法在Old Town场景中的多指标对比}
+\setlength{\tabcolsep}{2.75mm}{
 \begin{tabular}{lccccccc}
 \toprule
 方法                 & 时间                                                                             & 季节                  & 天气                  & 晨昏                  & $ATE_t$\textdownarrow{}               & $RPE_t$\textdownarrow{}              & $RPE_r$\textdownarrow{}              \\ \midrule
-离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\11:53\\(OT1)\end{tabular}                  & 冬季                  & 降雨                  & 清晨                  & 1.016104          & 0.456781               & 1.116236               \\ \midrule
-ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\12:24\\(OT2)\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{清晨} & 38.930786         & 4.441040          & \cellcolor[HTML]{FFCCC9}\textbf{1.078154} \\
-VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.965686          & 2.682027          & 1.172853          \\
-VLS                &                                                                                &                     &                     &                     & 1.143163          & 2.318242          & 1.443211 \\
-本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.846396} & \cellcolor[HTML]{FFCCC9}\textbf{2.318242} & 1.521039          \\ \bottomrule
-\end{tabular}
+离线建图               & \begin{tabular}[c]{@{}c@{}}10.08\\11:53\\（OT1）\end{tabular}                  & 冬季                  & 降雨                  & 清晨                  & 1.01          & 0.45               & 1.11               \\ \midrule
+ORB-SLAM3          & \multirow{4}{*}{\begin{tabular}[c]{@{}c@{}}02.25\\12:24\\（OT2）\end{tabular}} & \multirow{4}{*}{冬季} & \multirow{4}{*}{晴朗} & \multirow{4}{*}{清晨} & 38.93         & 4.44          & \cellcolor[HTML]{FFCCC9}\textbf{1.07} \\
+VINS-Fusion w/ RTK &                                                                                &                     &                     &                     & 0.96          & 2.68          & 1.17          \\
+VLS                &                                                                                &                     &                     &                     & 1.14          & 2.31          & 1.44 \\
+本文方法               &                                                                                &                     &                     &                     & \cellcolor[HTML]{FFCCC9}\textbf{0.84} & \cellcolor[HTML]{FFCCC9}\textbf{2.31} & 1.52          \\ \bottomrule
+\end{tabular}}
 \label{tab:loc_4seaons_ot2}
 \end{table}
 
@@ -708,59 +983,125 @@ VLS                &                                                            
 
 \subsection{消融实验}
 
-为了验证地图定位中的各个模块对定位精度的影响，本文进行了一系列的消融实验。在这些实验中，本文逐步增加地图定位中的各个子模块，从而验证了这些模块对定位精度的影响。具体实验结果如表~\ref{tab:loc_ablation} 所示，表中主要研究了“PO-VIO”、“粗到细定位”、“转换矩阵更新”、“相邻帧边”、“地图关键帧边”、“地图观测边”、“地图点先验边”和“真值地图”这8个变量对地图定位的影响，实验设置在Office Loop的第3条序列(OF3)上，以$ATE_t$为主要报告指标。
+为了验证地图定位模块中的各个部分对定位精度的影响，本节进行了一系列的消融实验。在这些实验中，本节逐步增加地图定位模块中的各个过程，从而验证了这些过程对定位精度的影响。具体实验结果如表~\ref{tab:loc_ablation} 所示，表中主要研究了“PO-VIO”、“粗到细定位”、“转换矩阵更新”、“相邻帧边”、“地图关键帧边”、“地图观测边”、“地图点先验边”和“真值地图”这8个过程对定位精度的影响，实验设置在Office Loop的第3条序列（OF3）上，以$ATE_t$为主要报告指标。
+
+% \begin{table}
+% \centering
+% \begin{threeparttable}
+% \caption{消融实验结果对比}
+% \begin{tabular}{ccccccccc}
+% \toprule
+% PO-VIO          & \begin{tabular}[c]{@{}c@{}}粗到细\\ 定位\end{tabular} & \begin{tabular}[c]{@{}c@{}}转换矩阵\\ 更新\end{tabular} & \begin{tabular}[c]{@{}c@{}}相邻帧\\ 边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 关键帧边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 观测边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图点\\ 先验边\end{tabular} & \begin{tabular}[c]{@{}c@{}}真值 \\ 地图 \end{tabular} & $ATE_t$    \\ \midrule
+% $\checkmark$ &                                                  &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 17.193425      \\
+%               & $\checkmark$                                     &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & \textgreater{}60     \\
+% $\checkmark$ & $\checkmark$                                     &                                                  &                                                 &                                                   &                                                  &                                                   &                                                 & \underline{6.987066} \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 1.898881 \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    &                                                   &                                                  &                                                   &                                                 & 1.445279       \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      &                                                  &                                                   &                                                 & 1.237693       \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     &                                                   &                                                 & 1.223113       \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      &                                                 & 0.938238       \\
+% $\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      & $\checkmark$                                    & 0.396039       \\ \bottomrule
+% \end{tabular}
+% \label{tab:loc_ablation}
+% \begin{tablenotes}
+%   \item [a] 实验构建在Office Loop的第3条序列(OF3)上
+%   \item [b] \underline{下划线}表示该序列在后期因为转换矩阵未更新而粗到细定位失败
+% \end{tablenotes}
+% \end{threeparttable}
+% \end{table}
 
 \begin{table}
 \centering
 \begin{threeparttable}
-\caption{消融实验结果对比}
+\caption{地图定位模块的消融实验结果}
 \begin{tabular}{ccccccccc}
 \toprule
 PO-VIO          & \begin{tabular}[c]{@{}c@{}}粗到细\\ 定位\end{tabular} & \begin{tabular}[c]{@{}c@{}}转换矩阵\\ 更新\end{tabular} & \begin{tabular}[c]{@{}c@{}}相邻帧\\ 边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 关键帧边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图\\ 观测边\end{tabular} & \begin{tabular}[c]{@{}c@{}}地图点\\ 先验边\end{tabular} & \begin{tabular}[c]{@{}c@{}}真值 \\ 地图 \end{tabular} & $ATE_t$    \\ \midrule
-$\checkmark$ &                                                  &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 17.193425      \\
+$\checkmark$ &                                                  &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 17.19      \\
               & $\checkmark$                                     &                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & \textgreater{}60     \\
-$\checkmark$ & $\checkmark$                                     &                                                  &                                                 &                                                   &                                                  &                                                   &                                                 & \underline{6.987066} \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 1.898881 \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    &                                                   &                                                  &                                                   &                                                 & 1.445279       \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      &                                                  &                                                   &                                                 & 1.237693       \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     &                                                   &                                                 & 1.223113       \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      &                                                 & 0.938238       \\
-$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      & $\checkmark$                                    & 0.396039       \\ \bottomrule
+$\checkmark$ & $\checkmark$                                     &                                                  &                                                 &                                                   &                                                  &                                                   &                                                 & \underline{6.98} \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   &                                                 &                                                   &                                                  &                                                   &                                                 & 1.89 \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    &                                                   &                                                  &                                                   &                                                 & 1.44       \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      &                                                  &                                                   &                                                 & 1.23       \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     &                                                   &                                                 & 1.22       \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      &                                                 & 0.93       \\
+$\checkmark$ & $\checkmark$                                     &$\checkmark$                                                   & $\checkmark$                                    & $\checkmark$                                      & $\checkmark$                                     & $\checkmark$                                      & $\checkmark$                                    & 0.31       \\ \bottomrule
 \end{tabular}
 \label{tab:loc_ablation}
 \begin{tablenotes}
-  \item [a] 实验构建在Office Loop的第3条序列(OF3)上
-  \item [b] \underline{下划线}表示该序列在后期因为转换矩阵未更新而粗到细定位失败
+  \item [a] 实验构建在Office Loop的第3条序列（OF3）上。
+  \item [b] \underline{下划线}表示该序列在后期因为转换矩阵未更新而粗到细定位失败。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
-在表~\ref{tab:loc_ablation} 中只有“粗到细定位”时产生了较大的定位误差，这是因为在PO-VIO和转换矩阵为粗到细定位提供先验位置信息的时候，粗到细定位的粗定位仅使用粗粒度特征产生了误匹配，从而将整个定位误差增长到了一个难以接受的程度。在第三行，当使用了VIO和转换矩阵后，这一定位误差极大得缩小到了一个可以接受的程度，这说明本文使用的转换矩阵具有非常重要的作用。但是在仅有转换矩阵而不维护的情况下，在序列的后段，由于PO-VIO的累积误差越来越大，使得转换矩阵不再能准确反映当前VIO结果和全局坐标系的正确关系，此时粗到细定位的先验位置信息也失去了意义，所以定位失败，因此表中的数据以下划线表示其是不完整序列的定位数据。在加入了转换矩阵更新之后，估计不完整的问题得到了解决，定位精度得到了进一步的提升。
+在表~\ref{tab:loc_ablation} 中只有“粗到细定位”时产生了较大的定位误差，这是因为粗到细定位在没有先验位置信息辅助的时候，其粗定位过程仅使用粗粒度特征易产生误匹配，从而将整个定位误差增长到了一个难以接受的程度。在第三行，当使用了PO-VIO和转换矩阵后，这一定位误差极大得缩小到了一个可以接受的程度，这说明本文使用的转换矩阵具有非常重要的作用。但是在仅有转换矩阵而不维护的情况下，在序列的后段，由于PO-VIO的累积误差越来越大，使得转换矩阵不再能准确反映当前VIO结果和全局坐标系的正确关系，此时粗到细定位的先验位置信息也失去了意义，所以定位失败，因此表中的数据以\underline{下划线}表示其是不完整序列的定位数据。在加入了转换矩阵更新之后，轨迹不完整的问题得到了解决，定位精度得到了进一步的提升。
 
-在第四行到第七行中，逐步加入了相邻帧边、地图关键帧边、地图观测边和地图点先验边，可以看到这些边的加入都使得定位精度得到了进一步的提升，这说明这些边对于定位精度的提升都是有益的。这表明本文所提出的紧耦合优化中的各个残差边都是对定位结果有正向作用的。
+在第5-8行中，逐步加入了相邻帧边、地图关键帧边、地图观测边和地图点先验边，可以看到这些边的加入都使得定位精度得到了进一步的提升，这说明这些边对于定位精度的提升都是有益的。这表明本文所提出的紧耦合优化中的各个残差边都是对定位结果有正向作用的。
 
-在最后一行中，加入了真值地图，可以看到定位精度得到了进一步的提升，这说明真值地图对于定位精度的提升是有益的。在使用了真值地图后，定位精度达到了30厘米左右，这可以看作是本文方法的定位精度上限，而这也与4Seasons数据集中实验情况相符：在建图精度不足的情况下，本文方法的精度上限受到地图精度的限制(例如Office Loop场景和Old Town场景)，但是在建图精度较高的情况下，本文方法的定位精度上限只由紧耦合地图定位模块的精度决定(例如Neighborhood场景和Business Campus场景)。
+在最后一行中，加入了真值地图，可以看到定位精度得到了进一步的提升，这说明真值地图对于定位精度的提升是有益的。在使用了真值地图后，定位精度达到了30厘米左右，这可以看作是本文方法的定位精度上限，而这也与4Seasons数据集中实验情况相符：在建图精度不足的情况下，本文方法的精度上限受到地图精度的限制（例如Office Loop场景和Old Town场景），但是在建图精度较高的情况下，本文方法的定位精度上限只由紧耦合地图定位模块的精度决定（例如Neighborhood场景和Business Campus场景）。
 
-\subsection{系统效率测试}
+\subsection{系统效率与成本分析}
+
+\subsubsection{效率分析}
+
+对于固定路线定位系统来说，效率是与精度同样重要的评价指标，因此针对地图定位系统的运行效率进行了展示与分析，如表~\ref{tab:loc_efficiency} 所示。具体来说，此处对地图定位模块中的各个过程进行了运行时间分析。主要的耗时过程包括：粗特征提取、粗特征匹配、细特征提取+匹配、概率投票定位、（紧耦合位姿图）优化。其中前四项均为粗到细视觉定位方法所涉及的过程，其中粗特征提取和细特征提取+匹配均涉及到神经网络的推理，因此分别展示了这些过程在TensorRT和PyTorch两个神经网络推理框架下的推理时间，并使用特殊符号${\dagger}$着重表示；粗特征匹配和概率投票定位均不需要神经网络，因此并不区分推理框架。此外，整个系统中另一个时间占用显著的过程是优化，因此也单独进行时间测试，其他过程由于单独耗时可以忽略，因此合计为一项。
 
 \begin{table}
 \centering
-\caption{本文地图定位模块运行时间测试}
 \begin{threeparttable}
+\caption{地图定位模块的运行时间（毫秒）测试}
+\setlength{\tabcolsep}{2.9mm}{
 \begin{tabular}{lccccccc}
-  \toprule
-  实现方法     & \begin{tabular}[c]{@{}c@{}}粗特征\\ 提取$^{\dagger}$\end{tabular} & \begin{tabular}[c]{@{}c@{}}粗特征\\ 匹配\end{tabular} & \begin{tabular}[c]{@{}c@{}}细特征\\ 提取+匹配$^{\dagger}$\end{tabular} & \begin{tabular}[c]{@{}c@{}}概率投票\\ 定位\end{tabular} & 优化                   & 其他                   & 总计    \\ \midrule
-  TensorRT & 9.0                                              & \multirow{2}{*}{0.4}                             & 4.2+20.1                                            & \multirow{2}{*}{3.5}                              & \multirow{2}{*}{1.4} & \multirow{2}{*}{0.1} & 38.7  \\
-  PyTorch  & 22.2                                             &                                                  & 59.8+242.6                                          &                                                   &                      &                      & 330.0 \\ \bottomrule
-  \end{tabular}
-\label{tab:efficiency}
+\toprule
+推理框架     & \begin{tabular}[c]{@{}c@{}}$^{\dagger}$粗特征\\ 提取\end{tabular} & \begin{tabular}[c]{@{}c@{}}粗特征\\ 匹配\end{tabular} & \begin{tabular}[c]{@{}c@{}}$^{\dagger}$细特征\\ 提取+匹配\end{tabular} & \begin{tabular}[c]{@{}c@{}}概率投票\\ 定位\end{tabular} & 优化                   & 其他                   & 总计    \\ \midrule
+TensorRT & 9.0                                              & \multirow{2}{*}{0.4}                             & 4.2+20.1                                            & \multirow{2}{*}{3.5}                              & \multirow{2}{*}{1.4} & \multirow{2}{*}{0.1} & 38.7  \\
+PyTorch  & 22.2                                             &                                                  & 59.8+242.6                                          &                                                   &                      &                      & 330.0 \\ \bottomrule
+\end{tabular}}
+\label{tab:loc_efficiency}
 \begin{tablenotes}
-  \item [a] 时间单位为毫秒(ms)
-  \item [b] ${\dagger}$表示此过程使用神经网络类方法
+  \item [a] ${\dagger}$表示此过程使用神经网络类方法。
 \end{tablenotes}
 \end{threeparttable}
 \end{table}
 
+通过表中数据的对比，可以清晰地看出本文方法中神经网络的时间开销是非常大的，尤其是在PyTorch框架下，细特征提取+匹配的时间开销达到了300ms以上，而整体的运行时间也达到了330ms，这意味着如果使用PyTorch框架进行本文方法的部署，那么在同等硬件条件下定位的频率也只能保持3Hz左右。而在TensorRT框架下，细特征提取+匹配的时间开销仅为30ms左右，整体的运行时间也仅为38ms，这说明本文使用TensorRT框架来支持地图定位模块是非常必要的。同时也证明本文系统具有实际可用的效率表现：在使用TensorRT框架的情况下，定位频率可以达到25Hz左右，可以满足绝大多数的实时定位需求。
+
+\subsubsection{成本分析}
+
+为了分析本文所提出系统在精度和成本方面的综合表现，表~\ref{tab:loc_cost} 中展示了当前集中主流定位方案的传感器配置、精度和成本，为了使对比更加公平且真实，每一种方案都列举了一种公开的商业产品型号。
+
+\begin{table}
+\centering
+\begin{threeparttable}
+\caption{地图定位模块的使用成本分析}
+\begin{tabular}{lcccccc}
+\toprule
+产品型号                                                                                       & 定位方法       & 位置 & 姿态 & 传感器价格          & 持续服务     & 精度上限  \\ \midrule
+北天BS-357\cite{BS-357}                                                                                   & 单频GNSS     &  $\checkmark$  &     & \textyen100            & N/A      & 5.00m    \\
+千寻SV100\cite{SV100}                                                                                    & RTK        &  $\checkmark$  &    & \textyen12,100          & \textyen2,400/套/年 & 0.02m \\
+千寻GJ-A802\cite{GJ-A802}                                                                                  & GNSS/INS   &  $\checkmark$  &  $\checkmark$  & \textyen19,200          & \textyen2,400/套/年 & 0.02m \\
+\rowcolor{gray!20} 传感器组合 & 本文系统 &  $\checkmark$  &  $\checkmark$  & \textyen7,467 & N/A      & 0.30m  \\ \bottomrule 
+% \rowcolor{gray!20} Gemini 2 L\cite{Gemini-2L}& 本文方法 &  $\checkmark$  &  $\checkmark$  &  \textyen 2,200           & N/A      & 0.3m  \\ \bottomrule
+\end{tabular}
+\label{tab:loc_cost}
+\begin{tablenotes}
+  \item [a] 传感器组合使用了Basler acA2040-35gm\cite{acA2040-35gm}相机和Analog Devices ADIS16465\cite{ADIS16465}IMU。
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+在表中，单频GNSS定位方案的精度上限为5米，价格为\textyen100，是所有定位方案中价格最低的形式。但是其存在的问题也非常明显：首先是精度差，最高5米的精度是所有方案中最差的，而且由于误差绝对值较大，在高级的车辆或轮式机器人应用中难以使用；其次是其功能仅限定位，没有可靠的姿态估计方案。
+
+RTK的定位方案相较于单频GNSS方案已经有了较大的精度提升，达到了厘米级别。但是其高昂的价格以及持续服务的费用，以千寻SV100\cite{SV100}为例，其价格为\textyen12,100，持续服务费用为\textyen2,400/套/年，这使得其部署成本高昂，尤其是在大规模的应用中。此外RTK的定位方案也仅限于位置估计，无法估计高精度姿态。
+
+GNSS/INS组合定位方案补全了RTK方案中姿态估计的缺失，但是其更高昂的硬件成本以及持续服务费用使定位成本大幅提高。
+
+本文方法需要依赖传感器组合，即相机和IMU来实现，因此其成本主要集中于传感器价格。以本文4Seasons数据集实验中的传感器为例，相机与IMU的组合价格为\textyen7,467，而本文系统在此传感器配置的基础上实现了30厘米的精度上限。虽然这一精度相较于RTK和GNSS/INS组合定位方案的精度上限有所差距，但是本文系统在传感器价格和持续服务方面有着明显的成本优势。
+
+综上所述，本文系统在精度和成本方面取得了较好的平衡：即以较低的价格实现了足够的精度上限，且不需要持续服务费用，这使得本文系统具有大规模部署的潜力。
+
+
 \section{本章总结}
 
-本章主要以实验验证的方式对本文所提出的固定路线定位方法进行了评估。首先，本章对实验实施的平台进行了介绍，包括实验所使用的数据集、实验所使用的硬件平台和软件平台以及实验的评估指标包括绝对轨迹误差和相对姿态误差。然后本章分别针对3个模块的性能进行了测试，并与一些常规方法进行对比，分析了本文方法的优势所在以及不足之处，在重要模块中还增加了消融实验来详细验证模块内组成部分对整体精度的影响。最后，本章对实验结果进行了总结，验证了本文方法的有效性和鲁棒性。
+本章主要以实验验证的方式对本文所提出的固定路线定位系统进行评估。首先，本章对实验实施的环境进行了介绍，包括实验所使用的数据集、实验所使用的硬件平台和软件平台以及实验的评估指标，包括绝对轨迹误差和相对姿态误差。然后本章分别针对3个模块的性能进行了测试：在建图模块测试中，本文所设计的建图方法在KITTI数据集上取得了优于单纯SfM和视觉-GNSS松耦合方法的精度，基本保持在厘米级精度；在PO-VIO模块测试中，本文方法在多个数据集的绝对位移误差和相对角度误差上均取得了相较基线和其他方法的优势表现，相对位移误差的劣势是由于相关变量梯度缺乏监督导致的；在地图定位模块测试中，本文方法在多个场景中均取得了厘米级的绝对定位精度，这一表现甚至优于一些高精度的视觉-GNSS融合方法。最后，本章还对本文方法的效率和成本进行了分析，证明了本文方法在精度和成本方面取得了较好的平衡。

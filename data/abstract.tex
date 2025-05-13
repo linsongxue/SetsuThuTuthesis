@@ -3,17 +3,17 @@
 % 中英文摘要和关键字
 
 \begin{abstract}
-  近年来，固定路线中运行的车辆、机器人等智能体越来越受到研究者关注，而定位是这类智能体的基础性功能之一，因此固定路线中的定位有着重要的研究意义和应用价值。以往的定位方法一般需要使用高精度的卫星信号或高成本的传感器来实现精确的定位功能，这些昂贵且需要精心维护的设备限制了低成本固定路线智能体的应用。
+  近年来，固定路线中运行的车辆、机器人等智能体越来越受到研究者们的关注，而定位是这类智能体的基础性功能之一，因此固定路线中的定位有着重要的研究意义和应用价值。以往的定位方法一般需要使用高精度的卫星信号或高成本的传感器来实现精确的定位功能，这些昂贵且需要精心维护的设备限制了低成本固定路线智能体的应用。
   
   为了使用低成本传感器完成较高精度的定位任务，本文提出了一种使用视觉惯性信息的固定路线定位系统，该系统涵盖了从建图到定位的完整流程，并分别从离线建图、里程计、地图定位三个方面针对现有方法中的设计问题进行改进：
 
-  (1) 现有的建图方法中存在着精度与成本的矛盾，低成本的建图方法，例如同步定位与建图，往往因为在线建图的局部优化限制而存在精度劣势。针对这一问题本文设计了一种以运动结构恢复(Structure from Motion, SfM)为基础并融合了高精度全局信息的离线建图模块。这一模块结合了SfM的全局优化精度优势和全局信息所提供的尺度信息，能够恢复出高精度且具有真实尺度的视觉点云地图。
+  （1）现有的建图方法中存在着精度与成本的矛盾，低成本的建图方法，例如同步定位与建图，往往因为在线建图的局部优化限制而存在精度劣势。针对这一问题本文设计了一种以运动结构恢复（Structure from Motion, SfM）为基础并融合了高精度全局信息的离线建图模块。这一模块结合了SfM的高精度全局优化和全局信息所提供的尺度信息，能够恢复出高精度且具有真实尺度的视觉点云地图。
 
-  (2) 现有的基于通用场景设计的视觉惯性里程计(Visual-Inertial Odometry, VIO)，忽略了车辆和轮式机器人运动模式中的先验知识。针对这一问题本文设计了一种基于车身运动模式感知的伪观测视觉惯性里程计(Pseudo Obsevation Visual-Inertial Odometry, PO-VIO)模块。这一模块根据车身运动模式来构建合理的伪观测约束，基于伪观测约束来估计车身与惯性传感器的标定参数，联合优化标定参数与车身状态量，能够估计出更为合理且更高精度的车身状态。
+  （2）现有的基于通用场景设计的视觉惯性里程计（Visual-Inertial Odometry, VIO），忽略了车辆和轮式机器人运动模式中的先验知识。针对这一问题本文设计了一种基于车身运动模式感知的伪观测视觉惯性里程计（Pseudo Obsevation Visual-Inertial Odometry, PO-VIO）模块。这一模块根据车身运动模式来构建合理的伪观测约束，基于伪观测约束来估计车身与惯性传感器的标定参数，联合优化标定参数与车身状态量，能够估计出更为合理且更高精度的车身状态。
 
-  (3) 现有的地图定位方法普遍将定位问题看作是基于地图观测的最大似然估计问题，这一做法忽略了地图本身存在的误差。针对这一问题本文设计了一种基于最大后验概率估计的地图定位模块。这一模块将地图点的误差建模为以其空间坐标为中心的三维高斯分布，并基于这一先验概率分布进行位置和姿态的最大后验概率估计，有效减小了建图误差带来的定位误差。
+  （3）现有的地图定位方法普遍将定位问题看作是基于地图观测的最大似然估计问题，这一做法忽略了地图本身存在的误差。针对这一问题本文设计了一种基于最大后验（Maximum A Posteriori, MAP）概率估计的地图定位模块。这一模块将地图点的误差建模为以其空间坐标为中心的三维高斯分布，并基于这一先验概率分布进行位置和姿态的最大后验概率估计，有效减小了建图误差带来的定位误差。
 
-  本文所提出的系统在3个公开数据集上进行了测试，论证了本文所提出系统的有效性，并通过消融实验分析了各种设计的效果。实验表明，本文所提出的固定路线中的视觉惯性定位系统有着较高的定位精度，在理想场景下可以达到厘米级的定位精度，并且可以适应天气、光照变化等环境因素改变的场景。
+  本文在3个公开数据集上对所提出的系统进行了测试，论证了本文所提出系统的有效性，并通过消融实验分析了各种设计的效果。实验表明，本文所提出的固定路线中的视觉惯性定位系统有着较高的定位精度，在理想场景下可以达到厘米级的定位精度，并且可以适应天气、光照变化等环境因素改变的场景。
 
   % 关键词用“英文逗号”分隔，输出时会自动处理为正确的分隔符
   \thusetup{
@@ -24,13 +24,13 @@
 \begin{abstract*}
   In recent years, intelligent agents operating on fixed routes—such as vehicles and robots—have attracted increasing attention due to the fundamental role of localization in their operation. However, conventional localization methods typically rely on high-precision satellite signals or expensive sensors, limiting the application of low-cost fixed-route systems.
 
-  To achieve high-accuracy localization with low-cost sensors, this paper presents a visual–inertial localization system tailored for fixed-route applications. The system encompasses a complete pipeline from mapping to localization and introduces targeted improvements in three key areas:
+  To achieve high-accuracy localization with low-cost sensors, this thesis presents a visual–inertial localization system tailored for fixed-route applications. The system encompasses a complete pipeline from mapping to localization and introduces targeted improvements in three key areas:
 
-  (1) Existing mapping methods face a trade-off between accuracy and cost. Low-cost mapping approaches, such as simultaneous localization and mapping (SLAM), often suffer from accuracy limitations due to the inherent local optimization in online mapping. To overcome this issue, we design an offline mapping module based on Structure from Motion (SfM) that integrates high-precision global information. This module leverages the global optimization benefits of SfM and the scale information provided by global data to reconstruct high-accuracy visual point cloud maps with real-world scale.
+  (1) Existing mapping methods face a trade-off between accuracy and cost. Low-cost mapping approaches, such as simultaneous localization and mapping (SLAM), often suffer from accuracy limitations due to the inherent local optimization in online mapping. To overcome this issue, this thesis designs an offline mapping module based on Structure from Motion (SfM) that integrates high-precision global information. This module leverages the global optimization benefits of SfM and the scale information provided by global data to reconstruct high-accuracy visual point cloud maps with real-world scale.
 
-  (2) Conventional VIO systems designed for general scenarios typically overlook the prior knowledge inherent in the motion patterns of vehicles and wheeled robots. To address this limitation, we propose a pseudo-observation visual–inertial odometry (PO-VIO) module based on vehicle motion pattern perception. This module constructs appropriate pseudo-observation constraints derived from vehicle dynamics to estimate the calibration parameters between the vehicle body and the inertial sensor. By jointly optimizing these calibration parameters and the vehicle state, the system achieves more accurate and reliable vehicle motion estimates.
+  (2) Conventional VIO systems designed for general scenarios typically overlook the prior knowledge inherent in the motion patterns of vehicles and wheeled robots. To address this limitation, a pseudo-observation visual–inertial odometry (PO-VIO) module based on vehicle motion pattern perception is proposed in this thesis. This module constructs appropriate pseudo-observation constraints derived from vehicle dynamics to estimate the calibration parameters between the vehicle body and the inertial sensor. By jointly optimizing these calibration parameters and the vehicle state, the system achieves more accurate and reliable vehicle motion estimates.
 
-  (3) Most existing map-based localization methods treat the problem as one of maximum likelihood estimation based solely on map observations, thereby neglecting inherent map errors. To mitigate this, we design a map-based localization module based on maximum a posteriori (MAP) estimation. In this approach, the error associated with each map point is modeled as a three-dimensional Gaussian distribution centered on its spatial coordinates. This probabilistic modeling is then employed to perform MAP estimation of both position and orientation, effectively reducing localization errors caused by mapping inaccuracies.
+  (3) Most existing map-based localization methods treat the problem as one of maximum likelihood estimation based solely on map observations, thereby neglecting inherent map errors. To mitigate this, a map-based localization module based on Maximum A Posteriori (MAP) estimation is designed in this thesis. In this approach, the error associated with each map point is modeled as a three-dimensional Gaussian distribution centered on its spatial coordinates. This probabilistic modeling is then employed to perform MAP estimation of both position and orientation, effectively reducing localization errors caused by mapping inaccuracies.
 
   The proposed system is evaluated on three publicly available datasets, and ablation studies are conducted to assess the contributions of the individual components. Experimental results demonstrate that the visual–inertial localization system achieves high localization accuracy—reaching centimeter-level precision under ideal conditions—and robustly adapts to environmental variations such as changes in weather and lighting.
 

@@ -402,6 +402,16 @@
   year    = {2018}
 }
 
+@article{du2021vulnerabilities,
+  title     = {Vulnerabilities and integrity of precise point positioning for intelligent transport systems: Overview and analysis},
+  author    = {Du, Yujun and Wang, Jinling and Rizos, Chris and El-Mowafy, Ahmed},
+  journal   = {Satellite Navigation},
+  volume    = {2},
+  pages     = {1--22},
+  year      = {2021},
+  publisher = {Springer}
+}
+
 @article{li2022review,
   title     = {Review of PPP--RTK: Achievements, challenges, and opportunities},
   author    = {Li, Xingxing and Huang, Jiaxin and Li, Xin and Shen, Zhiheng and Han, Junjie and Li, Linyang and Wang, Bo},
@@ -676,6 +686,16 @@
   publisher = {SAGE Publications Sage UK: London, England}
 }
 
+@misc{leutenegger2022okvis2realtimescalablevisualinertial,
+  title         = {OKVIS2: Realtime Scalable Visual-Inertial SLAM with Loop Closure},
+  author        = {Leutenegger, Stefan},
+  year          = {2022},
+  eprint        = {2202.09199},
+  archiveprefix = {arXiv},
+  primaryclass  = {eess.IV},
+  url           = {https://arxiv.org/abs/2202.09199}
+}
+
 @inproceedings{harris1988combined,
   title        = {A combined corner and edge detector},
   author       = {Harris, Chris and Stephens, Mike and others},
@@ -889,11 +909,14 @@
   publisher = {MDPI}
 }
 
-@article{yang2022real,
-  title   = {A real-time fusion framework for long-term visual localization},
-  author  = {Yang, Yuchen and Zhang, Xudong and Gao, Shuang and Wan, Jixiang and Ping, Yishan and Liu, Yuyue and Li, Jijunnan and Guo, Yandong},
-  journal = {arXiv preprint arXiv:2210.09757},
-  year    = {2022}
+@misc{yang2022real,
+  title         = {A Real-Time Fusion Framework for Long-term Visual Localization},
+  author        = {Yuchen Yang and Xudong Zhang and Shuang Gao and Jixiang Wan and Yishan Ping and Yuyue Liu and Jijunnan Li and Yandong Guo},
+  year          = {2022},
+  eprint        = {2210.09757},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CV},
+  url           = {https://arxiv.org/abs/2210.09757}
 }
 
 @article{subirana2011transformations,
@@ -915,13 +938,23 @@
 }
 
 @article{lepetit2009ep,
-  title     = {EP n P: An accurate O (n) solution to the P n P problem},
-  author    = {Lepetit, Vincent and Moreno-Noguer, Francesc and Fua, Pascal},
-  journal   = {International journal of computer vision},
-  volume    = {81},
-  pages     = {155--166},
-  year      = {2009},
-  publisher = {Springer}
+  author     = {Lepetit, Vincent and Moreno-Noguer, Francesc and Fua, Pascal},
+  title      = {EPnP: An Accurate O(n) Solution to the PnP Problem},
+  year       = {2009},
+  issue_date = {February 2009},
+  publisher  = {Kluwer Academic Publishers},
+  address    = {USA},
+  volume     = {81},
+  number     = {2},
+  issn       = {0920-5691},
+  url        = {https://doi.org/10.1007/s11263-008-0152-6},
+  doi        = {10.1007/s11263-008-0152-6},
+  abstract   = {We propose a non-iterative solution to the P n P problem--the estimation of the pose of a calibrated camera from n 3D-to-2D point correspondences--whose computational complexity grows linearly with n . This is in contrast to state-of-the-art methods that are O ( n 5) or even O ( n 8), without being more accurate. Our method is applicable for all n 4 and handles properly both planar and non-planar configurations. Our central idea is to express the n 3D points as a weighted sum of four virtual control points. The problem then reduces to estimating the coordinates of these control points in the camera referential, which can be done in O ( n ) time by expressing these coordinates as weighted sum of the eigenvectors of a 12 12 matrix and solving a small constant number of quadratic equations to pick the right weights. Furthermore, if maximal precision is required, the output of the closed-form solution can be used to initialize a Gauss-Newton scheme, which improves accuracy with negligible amount of additional time. The advantages of our method are demonstrated by thorough testing on both synthetic and real-data.},
+  journal    = {Int. J. Comput. Vision},
+  month      = feb,
+  pages      = {155–166},
+  numpages   = {12},
+  keywords   = {Pose estimation, Perspective-n-Point, Absolute orientation}
 }
 
 @article{gao2003complete,
@@ -942,6 +975,16 @@
   volume    = {92},
   pages     = {144--152},
   year      = {2015},
+  publisher = {Elsevier}
+}
+
+@article{wang2023dual,
+  title     = {The dual Euler-Rodrigues formula in various mathematical forms and their intrinsic relations},
+  author    = {Wang, Kun and Dai, Jian S},
+  journal   = {Mechanism and Machine Theory},
+  volume    = {181},
+  pages     = {105184},
+  year      = {2023},
   publisher = {Elsevier}
 }
 
@@ -986,13 +1029,6 @@
   pages        = {573--580},
   year         = {2012},
   organization = {IEEE}
-}
-
-@misc{qin2019a,
-  author = {Tong Qin and Jie Pan and Shaozu Cao and Shaojie Shen},
-  title  = {A General Optimization-based Framework for Local Odometry Estimation with Multiple Sensors},
-  year   = {2019},
-  eprint = {arXiv:1901.03638}
 }
 
 @article{zhang2023map,
@@ -1091,17 +1127,31 @@
   year    = {2017}
 }
 
-@article{kingma2014adam,
-  title   = {Adam: A method for stochastic optimization},
-  author  = {Kingma, Diederik P},
-  journal = {arXiv preprint arXiv:1412.6980},
-  year    = {2014}
+@misc{kingma2017adam,
+  title         = {Adam: A Method for Stochastic Optimization},
+  author        = {Diederik P. Kingma and Jimmy Ba},
+  year          = {2017},
+  eprint        = {1412.6980},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.LG},
+  url           = {https://arxiv.org/abs/1412.6980}
 }
 
 @book{imu_preintegration,
   author = {Christian Forster and Luca Carlone and Frank Dellaert and Davide Scaramuzza},
   title  = {IMU preintegration on Manifold for Efficient Visual-Inertial Maximum-a-Posteriori Estimation},
   year   = {2015}
+}
+
+@article{zhang2021pose,
+  title     = {Pose estimation for ground robots: On manifold representation, integration, reparameterization, and optimization},
+  author    = {Zhang, Mingming and Zuo, Xingxing and Chen, Yiming and Liu, Yong and Li, Mingyang},
+  journal   = {IEEE Transactions on Robotics},
+  volume    = {37},
+  number    = {4},
+  pages     = {1081--1099},
+  year      = {2021},
+  publisher = {IEEE}
 }
 
 @misc{vincentqin2022colmapgps,
@@ -1225,6 +1275,28 @@
   issn    = {1672-8262}
 }
 
+@article{XDDH202401014,
+  author  = { 房成贺 and  陈荣伟 and  李振海 and  耿长江 and  李奇 },
+  title   = {行业北斗高精度位置服务评测研究},
+  journal = {现代导航},
+  volume  = {15},
+  number  = {01},
+  pages   = {13-23},
+  year    = {2024},
+  issn    = {1674-7976}
+}
+
+@article{WTZB202201018,
+  author  = { 赵子枭 and  郭延伟 and  吴涛 and  彭峻峰 and  梁永庆 },
+  title   = {千寻位置与自建GNSS控制网的精度分析},
+  journal = {物探装备},
+  volume  = {32},
+  number  = {01},
+  pages   = {64-66},
+  year    = {2022},
+  issn    = {1671-0657}
+}
+
 @inproceedings{wexler2003learning,
   title        = {Learning epipolar geometry from image sequences},
   author       = {Wexler, Yonatan and Fitzgibbon, Andrew W and Zisserman, Andrew},
@@ -1282,3 +1354,139 @@
   key     = {beitian}
 }
 
+@online{BS-357,
+  author  = {{Shenzhen Beitian Communication Co., Ltd}},
+  title   = {GNSS Module BS-357},
+  year    = {2013},
+  urldate = {2013},
+  url     = {https://www.beitian.com/sys-pd/57.html}
+}
+
+@online{acA2040-35gm,
+  author  = {Basler, AG},
+  title   = {acA2040-35gm},
+  year    = {2024},
+  urldate = {2024-07-20},
+  url     = {https://docs.baslerweb.com/aca2040-35gm}
+}
+
+@online{ADIS16465,
+  author  = {{Analog Devices, Inc}},
+  title   = {ADIS16465},
+  year    = {2024},
+  urldate = {2024-08-15},
+  url     = {https://www.analog.com/en/products/adis16465.html}
+}
+
+@online{SV100,
+  author  = {千寻位置网络有限公司},
+  title   = {厘米级定位GNSS接收机SV100服务套装},
+  year    = {2022},
+  urldate = {2022-08-19},
+  url     = {https://mall.qxwz.com/market/skzn/products/C-08acwrmwnp6gw}
+}
+
+@online{GJ-A802,
+  author  = {千寻位置网络有限公司},
+  title   = {厘米车规级车载高精度组合定位设备GJ-A802服务套装},
+  year    = {2023},
+  urldate = {2023-12},
+  url     = {https://mall.qxwz.com/market/skzn/products/C-08bq0itj6kruo}
+}
+
+@online{Gemini-2L,
+  author  = {{Orbbec, Inc}},
+  title   = {Gemini 2 L},
+  year    = {2023},
+  urldate = {2023-04},
+  url     = {https://www.orbbec.com/products/stereo-vision-camera/gemini-2l/}
+}
+
+@inproceedings{xu2023airvo,
+  title        = {Airvo: An illumination-robust point-line visual odometry},
+  author       = {Xu, Kuan and Hao, Yuefan and Yuan, Shenghai and Wang, Chen and Xie, Lihua},
+  booktitle    = {2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+  pages        = {3429--3436},
+  year         = {2023},
+  organization = {IEEE}
+}
+
+@inproceedings{fu2024visual,
+  title        = {Visual SLAM System Integrating Feature Extraction Based on Vision Transformer and Cloud-Edge Technology},
+  author       = {Fu, Bo and Yao, Xulin},
+  booktitle    = {2024 International Conference on Intelligent Computing and Robotics (ICICR)},
+  pages        = {73--77},
+  year         = {2024},
+  organization = {IEEE}
+}
+
+@misc{xiao2024realtimerobustversatilevisualslam,
+  title         = {A real-time, robust and versatile visual-SLAM framework based on deep learning networks},
+  author        = {Zhang Xiao and Shuaixin Li},
+  year          = {2024},
+  eprint        = {2405.03413},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.RO},
+  url           = {https://arxiv.org/abs/2405.03413}
+}
+
+@article{赵琳2021多系统混频非差非组合精密单点定位方法研究,
+  title   = {多系统混频非差非组合精密单点定位方法研究},
+  author  = {赵琳 and 李宏宇 and 侯毅男 and 杨福鑫 and 李亮},
+  journal = {导航定位与授时},
+  volume  = {008},
+  number  = {005},
+  pages   = {96-102},
+  year    = {2021}
+}
+
+@article{dardanelli2021nrtk,
+  title     = {NRTK, PPP or static, that is the question. Testing different positioning solutions for GNSS survey},
+  author    = {Dardanelli, Gino and Maltese, Antonino and Pipitone, Claudia and Pisciotta, Alessandro and Lo Brutto, Mauro},
+  journal   = {Remote Sensing},
+  volume    = {13},
+  number    = {7},
+  pages     = {1406},
+  year      = {2021},
+  publisher = {MDPI}
+}
+
+@misc{qin2019a,
+  title         = {A General Optimization-based Framework for Global Pose Estimation with Multiple Sensors},
+  author        = {Tong Qin and Shaozu Cao and Jie Pan and Shaojie Shen},
+  year          = {2019},
+  eprint        = {1901.03642},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.CV},
+  url           = {https://arxiv.org/abs/1901.03642}
+}
+
+@article{aslan2022comprehensive,
+  title     = {A comprehensive survey of the recent studies with UAV for precision agriculture in open fields and greenhouses},
+  author    = {Aslan, Muhammet Fatih and Durdu, Akif and Sabanci, Kadir and Ropelewska, Ewa and G{\"u}ltekin, Seyfettin Sinan},
+  journal   = {Applied Sciences},
+  volume    = {12},
+  number    = {3},
+  pages     = {1047},
+  year      = {2022},
+  publisher = {Mdpi}
+}
+
+@article{zeng2023fast,
+  title     = {Fast and robust semidirect monocular visual-inertial odometry for UAV},
+  author    = {Zeng, Qingxi and Yu, Haonan and Ji, Xufang and Tao, Xiaodong and Hu, Yixuan},
+  journal   = {IEEE Sensors Journal},
+  volume    = {23},
+  number    = {20},
+  pages     = {25254--25262},
+  year      = {2023},
+  publisher = {IEEE}
+}
+
+@article{nguyen2024learning,
+  title     = {Learning Visual-Inertial Odometry With Robocentric Iterated Extended Kalman Filter},
+  author    = {Nguyen, Khac Duy and Tran, Dinh Tuan and Pham, Van Quyen and Nguyen, Dinh Tuan and Inoue, Katsumi and Lee, Joo-Ho and Nguyen, Anh Quang},
+  journal   = {IEEE Access},
+  year      = {2024},
+  publisher = {IEEE}
+}

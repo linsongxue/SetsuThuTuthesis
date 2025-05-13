@@ -1,14 +1,13 @@
 % !TeX root = ../thuthesis-example.tex
 
-\chapter{基于车身运动模式感知的PO-VIO设计}
+\chapter{基于车身运动模式感知的里程计模块设计}
 
-本章主要对PO-VIO模块进行介绍。本文中的PO-VIO不同于通用的里程计，其专门针对车辆或者轮式机器人进行了优化，针对这类平台的运动模式进行了假设与分类，并根据分类情况分别提出了相应的速度伪观测约束条件。在运动模式的检测方面，本章介绍了一种基于深度学习的方法。在伪观测约束的使用方面，本章设计了粗对齐过程并在原有的后端优化中加入了惯性-车体因子联合优化。
+本章主要对里程计模块，即PO-VIO进行介绍。本文提出的PO-VIO不同于通用的里程计，其针对车辆或者轮式机器人的运动模式进行了假设与分类，并根据分类情况分别提出了相应的速度伪观测约束条件。在运动模式的检测方面，本章介绍了一种基于深度学习的方法。在伪观测约束的使用方面，本章设计了粗对齐过程并在原有的后端优化中加入了惯性-车体因子联合优化。
 
-\section{PO-VIO整体设计}
-PO-VIO是视觉惯性定位的关键组成部分，其工作是为定位提供较为精确的帧间运动关系约束，这对于最终的定位精度有着不可忽视的作用。通用的VIO常用于无人机、自动驾驶车辆和机器人等领域，其一般假设机体做任意运动，因此以构建惯性和视觉观测之间的约束关系为主，并不会根据机体的运动模式做额外设计。而本章所设计的伪观测视觉惯性里程计(Pseudo Obsevation Visual-Inertial Odometry, PO-
-VIO)则是在通用VIO的基础上融合了伪观测约束的改进版本。
+\section{伪观测视觉惯性里程计整体设计}
+PO-VIO是视觉惯性定位的关键组成部分，其工作是为定位提供较为精确的帧间运动关系约束，这对于最终的定位精度有着不可忽视的作用。通用的VIO常用于无人机、自动驾驶车辆和机器人等领域，其一般假设机体做任意运动，因此以构建惯性和视觉观测之间的约束关系为主，并不会根据机体的运动模式做额外设计。而本章所设计的模块则是在通用VIO的基础上融合了伪观测约束的改进版本。
 
-在固定路线的车辆或轮式机器人定位中，机体的运动模式往往有规律可循，并由此引申出部分伪观测约束：本文考虑的汽车和轮式机器人，其运动往往在平面上进行，因此其速度一般可以分解为沿着车辆前进方向的速度和沿着车身横向的速度；以车身坐标系为参考，车辆在某些运动模式下不具有沿着车身横向以及重力垂直方向的速度。换言之，车辆或者轮式机器人，在某些运动模式下，其横向和重力方向的速度可以取得0值，这种逻辑推导而非实际测量获得的观测即为本文所述的伪观测。
+在固定路线的车辆或轮式机器人定位中，机体的运动模式往往有规律可循，并由此引申出部分伪观测约束：本文考虑的汽车和轮式机器人，其运动往往在平面上进行，因此其速度一般可以分解为沿着车辆前进方向的速度和沿着车身横向的速度；以车身坐标系为参考，车辆在某些运动模式下不具有沿着车身横向以及重力垂直方向的速度。换言之，车辆或者轮式机器人，在某些运动模式下，其横向和重力方向的速度可以取得0值，这种逻辑推导而非实际测量获得的观测即为本文所述的伪观测，伪观测所涉及的物理模型在图~\ref{fig:vehicle} 中展示。
 
 \begin{figure}
   \centering
@@ -66,37 +65,37 @@ VIO)则是在通用VIO的基础上融合了伪观测约束的改进版本。
 
 
   \end{tikzpicture}
-  \caption{车身坐标系和IMU体坐标系分解示意}
+  \caption{车身坐标系和IMU体坐标系分解示意图}
   \label{fig:vehicle}
 \end{figure}
 
-如图~\ref{fig:vehicle} 所示，实线代表IMU体坐标系$(\cdot)^{b_{j}}$，虚线代表车身坐标系$(\cdot)^{v_{j}}$，车身坐标系的$y$轴沿着车辆前进方向，$x$轴沿着车辆横向方向，$z$轴垂直于地面向上。IMU体坐标系即IMU的测量坐标系，其一般情况下与车身坐标系会存在一定的旋转关系，并不一定如图所示的共向。在当前的坐标系下，假设车辆或机器人行驶在平面(不考虑上下坡导致的$z$轴速度)，其运动模式可能存在3种情况：
+如图~\ref{fig:vehicle} 所示，实线代表IMU体坐标系$(\cdot)^{b_{j}}$，虚线代表车身坐标系$(\cdot)^{v_{j}}$，车身坐标系的$y$轴沿着车辆前进方向，$x$轴沿着车辆横向方向，$z$轴垂直于地面向上。IMU体坐标系即IMU的测量坐标系，其一般情况下与车身坐标系会存在一定的旋转关系，并不一定如图所示的共向。在当前的坐标系下，假设车辆或机器人行驶在平面（不考虑上下坡导致的$z$轴速度），其运动模式可能存在3种情况：
 
-(1) 车辆静止，此运动模式下车身坐标系的$y$与$x$轴均无速度；
+（1）车辆静止，此运动模式下车身坐标系的$y$与$x$轴均无速度；
 
-(2) 直线行驶，此运动模式下车身坐标系的$y$轴有速度，$x$轴无速度；
+（2）直线行驶，此运动模式下车身坐标系的$y$轴有速度，$x$轴无速度；
 
-(3) 车辆转弯，此运动模式下车身坐标系的$y$与$x$轴均有速度。
+（3）车辆转弯，此运动模式下车身坐标系的$y$与$x$轴均有速度。
 
-据此分析，可以在车辆或机器人静止和直线行驶时，基于情况(1)和情况(2)为车身增加两项伪观测，而这两项伪观测的约束条件可以提升通用VIO的精度。
+据此分析，可以在车辆或机器人静止和直线行驶时，基于情况（1）和情况（2）为车身增加两项伪观测，而这两项伪观测的约束条件可以提升通用VIO的精度。
+
+然而，在仅依靠IMU信息和视觉信息的情况下，如何区分车辆的运动模式仍是一个有待解决的问题。此外，这两项约束如何添加到通用VIO的优化中，也需要进一步的研究。为解决上述问题，本章着重介绍如图~\ref{fig:vio_pipeline} 所示的PO-VIO：其在通用VIO的基础上加入了车身运动模式判别、惯性-车体粗对齐等过程，并在窗口优化中加入了惯性-车体因子，这些改进（以绿色标注）保证了本章对车身运动模式的分析以及由此引申的伪观测约束能够合理工作。
 
 \begin{figure}
   \centering
-  \includegraphics[width=0.9\linewidth]{VIO_pipeline.pdf}
-  \caption{视觉惯性里程计框架}
+  \includegraphics[width=0.8\linewidth]{VIO_pipeline.pdf}
+  \caption{PO-VIO模块整体框架}
   \label{fig:vio_pipeline}
 \end{figure}
-
-然而，在仅依靠IMU信息和视觉信息的情况下，如何区分车辆的运动模式仍是一个有待解决的问题。此外，这两项约束如何添加到通用VIO的优化中，也需要进一步的研究。为解决上述问题，本章着重介绍如图~\ref{fig:vio_pipeline} 所示的PO-VIO：其在通用VIO的基础上加入了车身运动模式判别、惯性-车体粗对齐等过程，并在窗口优化中加入了惯性-车体因子，这些改进(以绿色标注)保证了本章对车身运动模式的分析以及由此引申的伪观测约束能够的合理工作。
 
 \section{基于神经网络的车身运动模式判别方法}
 \label{sec:vehicle_state}
 
 根据对车身运动模式的分析，只有在车辆和机器人停止或直线行驶时，才能添加伪观测约束。因此，需要在PO-VIO中设计车身运动模式判别模块，以区分车辆的运动状态。
 
-以往的工作中，\citet{hu2020memsimu}使用传统的统计方法来判别车辆的直行、变道和转弯等状态；\citet{brossard2020ai}使用卷积神经网络(Convolutional Neural Network, CNN)来生成车身3个轴向的测量噪声，以此来间接判别车辆状态；\citet{huang2022vehicle}则使用时间卷积神经网络(Temporal Convolutional Neural Network, TCN)根据IMU观测值来接判别车辆的运动状态。
+以往的工作中，Hu等\cite{hu2020memsimu}使用传统的统计方法来判别车辆的直行、变道和转弯等状态；Brossard等\cite{brossard2020ai}使用卷积神经网络（Convolutional Neural Network, CNN）来生成车身3个轴向的测量噪声，以此来间接判别车辆状态；Huang等\cite{huang2022vehicle}则使用时间卷积神经网络（Temporal Convolutional Neural Network, TCN）根据IMU观测值来接判别车辆的运动状态。
 
-然而，基于统计的判别方法需要事先采集IMU静止状态下的数据进行统计分析，不够灵活；基于CNN和TCN的方法针对每一条IMU数据进行判别，这在应用于高频率IMU(例如2000Hz及以上)时会造成极大的时延。针对以上问题，本章希望使用一种更加灵活，并且有望实时进行的方法来进行车身状态判别。
+然而，基于统计的判别方法需要事先采集IMU静止状态下的数据进行统计分析，不够灵活；基于CNN和TCN的方法针对每一条IMU数据进行判别，这在应用于高频率IMU（例如2000Hz及以上）时会造成极大的时延。针对以上问题，本章希望使用一种更加灵活，并且有望实时进行的方法来进行车身状态判别。
 
 近年来，因为深度学习技术在泛化性能上展现出的优势，本章希望使用基于深度学习的方法来进行车身状态判别。在输入信息的选择上，为了使得深度神经网络能够与IMU的处理频率相匹配，就不得不改变以往逐条处理IMU数据的模式，转而寻找一种批量处理IMU数据的模式。
 
@@ -107,13 +106,13 @@ VIO)则是在通用VIO的基础上融合了伪观测约束的改进版本。
 基于以上优势考虑，本章选择以Transformer结构为基础，设计一个用于车身运动模式判别的深度神经网络。
 
 \subsection{网络输出定义}
-对于网络的输出定义，本文选择对车身的$y$轴(车身前向)速度和$x$轴(车身横向)速度状态进行判别。用向量
+对于网络的输出定义，本章选择对车身的$y$轴（车身前向）速度和$x$轴（车身横向）速度状态进行判别。用向量
 \begin{equation}
   \symbf{z} = 
     \begin{bmatrix}
       z^{\rm FOR}\\
       z^{\rm LAT} 
-    \end{bmatrix} \in \{0, 1\}^{2}
+    \end{bmatrix} \in \{0, 1\}^{2},
 \end{equation}
 来表示车身是否处于静止的运动模式和车身是否处于直线行驶的运动模式。其中$z^{\rm FOR}$指示车身是否处于静止的运动模式，其取值为
 \begin{equation}
@@ -136,19 +135,19 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 对于网络输入，本章使用一个预积分因子内的IMU数据序列作为网络输入。单条IMU采样数据包括加速度计读数$\hat{\symbf{a}}^b \in \mathbb{R}^3$和陀螺仪读数$\hat{\symbf{\omega}}^b \in \mathbb{R}^3$，两个读数的可以分解为：
 \begin{equation}
 \begin{aligned}
-  &\hat{\symbf{a}}^b = \symbf{a}^b + \symbf{R}^{b}_{g}\cdot \symbf{g} + \symbf{b}_{a} + \symbf{n}_{a} \\
-  &\hat{\symbf{\omega}}^b = \symbf{\omega}^b + \symbf{b}_{\omega} + \symbf{n}_{\omega} 
+  &\hat{\symbf{a}}^b = \symbf{a}^b + \symbf{R}^{b}_{g}\cdot \symbf{g} + \symbf{b}_{a} + \symbf{n}_{a}, \\
+  &\hat{\symbf{\omega}}^b = \symbf{\omega}^b + \symbf{b}_{\omega} + \symbf{n}_{\omega}, 
 \end{aligned}
 \end{equation}
 其中$\symbf{a}^b, \symbf{\omega}^b$分别表示IMU此时真正的加速度和角速度，$\symbf{b}_{\omega}, \symbf{b}_{a}$分别表示陀螺仪和加速度计的零偏，$\symbf{n}_{\omega}, \symbf{n}_{a}$分别表示陀螺仪和加速度计的噪声，$\symbf{R}^{b}_{g}$表示此时全局坐标系到IMU体坐标系的旋转矩阵，$\symbf{g}$表示地球重力加速度。
 
-单条读数可以反映某一时刻的IMU运动情况，因此如果结合采样时间对IMU序列进行积分，就可以获得一段时间内的IMU运动情况，即旋转和位移。因此，使用IMU序列数据，理论上足以预测车身状态。实践中，本文将单条加速度计和单条陀螺仪读数拼接为一个6维向量，作为一条完整的IMU采样数据。在此之后，将预积分因子内的多条IMU采样数据拼接为一个矩阵$\symbf{X}\in \mathbb{R}^{n \times 6}$用以表示IMU数据序列，其中$\mathbb{R}^{n \times 6}$表示$\symbf{X}$由$n$条IMU读数组成。
+单条读数可以反映某一时刻的IMU运动情况，因此如果结合采样时间对IMU序列进行积分，就可以获得一段时间内的IMU运动情况，即旋转和位移。因此，使用IMU序列数据，理论上足以预测车身状态。实践中，本章将单条加速度计和单条陀螺仪读数拼接为一个6维向量，作为一条完整的IMU采样数据。在此之后，将预积分因子内的多条IMU采样数据拼接为一个矩阵$\symbf{X}\in \mathbb{R}^{n \times 6}$用以表示IMU数据序列，其中$\mathbb{R}^{n \times 6}$表示$\symbf{X}$由$n$条IMU读数组成。
 
 \subsection{网络结构设计}
 \label{sec:network_design}
 \begin{table}
   \centering
-  \caption{车身运动模式判别网络设计参数}
+  \caption{车身运动模式判别网络超参数}
   \begin{tabular}{lcccccc}
   \toprule
   层 & 层类型                 & 输入维度 & 特征维度 & 前馈层维度 & 头数 & 输出维度 \\
@@ -208,16 +207,15 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 
 对于网络训练，需要精心设计的过程主要包括数据清洗、预测真值生成、损失函数设计和训练策略。
 
-在数据清洗方面，由于IMU采样数据包括加速度和角速度，这两类数据的数值分布有较大差异：角速度以$rad/s$为单位，一般是一个较小的数字，加速度以$m/s^2$为单位，其取值范围一般较大。因此如果使用原始数据作为网络输入，往往会造成网络训练的不稳定，因此本文使用归一化策略，将所有的IMU采样数据元素调整为值域在$(-1, 1)$之间，具体而言：首先根据训练数据的分布特征计算IMU采样数据的均值$\symbf{\mu}\in \mathbb{R}^6$和逐元素标准差$\symbf{\sigma}\in \mathbb{R}^6$，然后对每一条IMU数据根据
+在数据清洗方面，由于IMU采样数据包括加速度和角速度，这两类数据的数值分布有较大差异：角速度以$rad/s$为单位，一般是一个较小的数字，加速度以$m/s^2$为单位，其取值范围一般较大。因此如果使用原始数据作为网络输入，往往会造成网络训练的不稳定，因此本文使用归一化策略，将所有的IMU采样数据元素调整为值域在-1到+1之间，具体而言：首先根据训练数据的分布特征计算IMU采样数据的均值$\symbf{\mu}\in \mathbb{R}^6$和逐元素标准差$\symbf{\sigma}\in \mathbb{R}^6$，然后对每一条IMU数据根据
 \begin{equation}
-  \symbf{x}' = \frac{\symbf{x} - \symbf{\mu}}{\symbf{\sigma}}
+  \symbf{x}' = \frac{\symbf{x} - \symbf{\mu}}{\symbf{\sigma}},
 \end{equation}
 进行转换。$\symbf{x}$是一条包括加速度和角速度的IMU数据，除法是逐元素除法。
 
-在预测真值生成方面，本文需要使用到车辆的精确运动姿态数据。具体来说，首先根据车辆的精确运动姿态的更新频率切分IMU序列，然后根据车身运动姿态自动生成真值$\symbf{z}$。根据对预设状态的分类，首先根据相对位置信息判断车辆是否静止，然后根据相对旋转判断车辆是否直线行驶，具体如算法~\ref{alg1} 所示，其中第16行即罗德里格斯旋转公式(Rodrigues' rotation formula)\cite{dai2015euler}将旋转矩阵转换为旋转向量，其具体过程详见附录~\ref{appendix:rodrigues}，$\text{norm}(\cdot)$表示对向量取模操作。
+在预测真值生成方面，本文需要使用到车辆的精确运动姿态数据。具体来说，首先根据车辆的精确运动姿态的更新频率切分IMU序列，然后根据车身运动姿态自动生成真值$\symbf{z}$。根据对预设状态的分类，首先根据相对位置信息判断车辆是否静止，然后根据相对旋转判断车辆是否直线行驶，具体如算法~\ref{alg1} 所示，其中第16行即罗德里格斯旋转公式（Rodrigues' rotation formula）\cite{wang2023dual}将旋转矩阵转换为旋转向量，其具体过程详见附录~\ref{appendix:rodrigues}，$\text{norm}(\cdot)$表示对向量取模操作。
 
-
-在损失函数和训练策略方面，由于模型的最终输出会使用Sigmoid函数进行概率预测，相对应的损失函数选择二值交叉熵损失函数(Binary Cross Entropy, BCE)。在训练策略方面，本文使用Adam优化器\cite{kingma2014adam}，学习率为$1e-4$，训练批次大小为8，训练轮数为100。
+在损失函数和训练策略方面，由于模型的最终输出会使用Sigmoid函数进行概率预测，相对应的损失函数选择二值交叉熵损失函数（Binary Cross Entropy, BCE）。在训练策略方面，本文使用Adam优化器\cite{kingma2017adam}，学习率为$1e-4$，训练批次大小为8，训练轮数为100。
 
 此外，由于一般情况下车辆直行的情况比静止和转弯的情况要多，如图~\ref{fig:data_distrib} 所示，因此如果直接使用全部数据训练，则会导致样本分布的不均衡。为了解决这个问题，本文在数据采样方面使用了均衡策略：在训练的每个轮次中，以转弯和静止区间的并集数据量为基准，从直行数据中随机采样等量数据，然后与转弯和静止区间的并集数据合并。
 
@@ -229,7 +227,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \label{fig:data_distrib}
 \end{figure}
 
-\section{基于车身运动学模式的伪观测预处理方法}
+\section{基于车身运动模式的伪观测预处理方法}
 
 伪观测可以为视觉惯性融合增加一定的约束条件，但是其并不能直接使用，而是需要一定的预处理过程，其中最关键的就是惯性-车体粗对齐。如图~\ref{fig:vehicle} 中的坐标系所示，车身坐标系和IMU体坐标系往往并不重合，有时甚至有较大的差距，而VIO中一般以IMU体坐标系作为姿态估计的基准坐标系。因此，如果使用车身坐标系的速度作为约束，就需要将IMU体坐标系的速度转换为车身坐标系的速度，这就需要进行惯性-车体粗对齐，即求解车身坐标系和IMU体坐标系的转换关系。一般来说，这个转换关系需要包含旋转和平移两种变换，但是考虑到车身整体的刚性结构，IMU与车身之间也是刚性连接，因此可以将车身坐标系与IMU体坐标系的原点等价为重合状态，在这种状态下可以只考虑车身坐标系与IMU坐标系之间的旋转关系。
 
@@ -247,7 +245,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
     0
   \end{bmatrix}\}^n.
 \end{equation}
-此时，关于车体和IMU体坐标系之间的旋转关系$\symbf{R}_{b}^{v}$可以求解以下带有约束的优化问题获得：
+此时，关于车体和IMU体坐标系之间的旋转关系$\symbf{R}_{b}^{v}$可以通过求解以下带有约束的优化问题获得：
 \begin{equation}
 \begin{aligned}
   &\min_{\symbf{R}_{b}^{v}} \symbf{J} = \frac{1}{2} \sum_{j=1}^{n} \| \symbf{v}^{v_{j}} - \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} \|_2^2 \\
@@ -277,7 +275,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \sum_{j=1}^{n} {\symbf{v}^{v_{j}}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{v}^{b_{j}} &= \text{trace}({\symbf{V}^{v}}^T \cdot \symbf{R}_{b}^{v} \cdot \symbf{V}^{b}) \\ 
   &= \text{trace}( \symbf{R}_{b}^{v} \cdot \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T), \label{eq:trace}
 \end{align}
-其中$\symbf{V}^{b}, {\symbf{V}^{v}}^T$分别是$\{\symbf{v}^{b_{j}}\}^n,\{\symbf{v}^{v_{j}}\}^n$序列的协方差矩阵。对$\symbf{V}^{b} \cdot {\symbf{V}^{v}}^T$进行奇异值分解(Singular Value Decomposition, SVD)可以获得
+其中$\symbf{V}^{b}, {\symbf{V}^{v}}^T$分别是$\{\symbf{v}^{b_{j}}\}^n,\{\symbf{v}^{v_{j}}\}^n$序列的协方差矩阵。对$\symbf{V}^{b} \cdot {\symbf{V}^{v}}^T$进行奇异值分解（Singular Value Decomposition, SVD）可以获得
 \begin{equation}
   \symbf{V}^{b} \cdot {\symbf{V}^{v}}^T = \symbf{U} \cdot \symbf{\Sigma} \cdot \symbf{V}^T,
 \label{eq:svd}
@@ -315,7 +313,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \| \symbf{r}_p - \symbf{H}_p \cdot \mathcal{X} \|^2_2 + \sum_{k\in\mathcal{B}} \| \symbf{r}'_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) \|^2_{\symbf{P}_{b_k}^{b_{k+1}}}
   + \sum_{(l,j)\in\mathcal{C}} \rho(\| \symbf{r}_{\mathcal{C}}(\hat{\symbf{z}}_{l}^{c_j}, \mathcal{X}) \|^2_{\symbf{P}_{l}^{c_j}}) \end{Bmatrix},
 \end{equation}
-其中$\symbf{r}_p, \symbf{H}_p$代表与边缘化相关的观测与矩阵，$\symbf{r}_{\mathcal{C}}$代表视觉观测的残差函数，其并不是本章叙述重点，因此在附录~\ref{appendix:nonlinear_optimization} 中描述。$\symbf{r}'_{\mathcal{B}}$是本文提出的、结合伪观测约束的IMU残差函数，$\symbf{P}_{l}^{c_j}$代表视觉观测的协方差矩阵，$\symbf{P}_{b_k}^{b_{k+1}}$代表伪观测约束的协方差矩阵，$\mathcal{B}$表示存在IMU残差的时刻集合，$\mathcal{C}$则表示地图点和视觉观测的匹配集合。$\symbf{r}'_{\mathcal{B}}$具体可以表示为
+其中$\symbf{r}_p, \symbf{H}_p$代表与边缘化相关的观测与矩阵，$\symbf{r}_{\mathcal{C}}$代表视觉观测的残差函数，其并不是本章叙述重点，因此在附录~\ref{appendix:nonlinear_optimization} 中描述。$\symbf{r}'_{\mathcal{B}}$是本章提出的、结合伪观测约束的IMU残差函数，$\symbf{P}_{l}^{c_j}$代表视觉观测的协方差矩阵，$\symbf{P}_{b_k}^{b_{k+1}}$代表伪观测约束的协方差矩阵，$\mathcal{B}$表示存在IMU残差的时刻集合，$\mathcal{C}$则表示地图点和视觉观测的匹配集合。$\symbf{r}'_{\mathcal{B}}$具体可以表示为
 \begin{equation}
   \symbf{r}'_{\mathcal{B}}(\hat{\symbf{z}}_{b_k}^{b_{k+1}}, \mathcal{X}) = 
   \begin{bmatrix} 
@@ -337,7 +335,7 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
     \begin{bmatrix} \symbf{0}, \symbf{0}, \symbf{0}  \end{bmatrix}, \text{Otherwise}
   \end{cases}.
 \end{equation}
-其中$\symbf{e}_i$表示单位矩阵的第$i$列向量，$\symbf{y}^{FOR}, \symbf{y}^{LAT}$分别表示预测的车辆的前向速度为0(静止)和横向速度为0(直行)。
+其中$\symbf{e}_i$表示单位矩阵的第$i$列向量，$\symbf{y}^{FOR}, \symbf{y}^{LAT}$分别表示预测的车辆的前向速度为0（静止）和横向速度为0（直行）。
 
 \subsection{优化目标的雅可比矩阵计算}
 
@@ -346,9 +344,13 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
   \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{v}_{b_{k}}^o} = \symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{R}_{b_k}^o}^{-1}.
 \label{eq:JrJv}
 \end{equation}
-对于$\symbf{q}_{b_{k}}^o$的雅可比矩阵，约束中并没有直接使用四元数$\symbf{q}_{b_{k}}^o$，而是使用等价的旋转矩阵$\symbf{R}_{b_{k}}^o$，避免了四元数运算$\otimes$的繁琐使用。求导方式本文选择使用扰动模型\cite{imu_preintegration}进行，假设旋转的扰动值为$\symbf{\varphi } \in \mathbb{R}^3$(对于四元数和旋转矩阵有同样的效果)，则：
+对于$\symbf{q}_{b_{k}}^o$的雅可比矩阵，约束中并没有直接使用四元数$\symbf{q}_{b_{k}}^o$，而是使用等价的旋转矩阵$\symbf{R}_{b_{k}}^o$，避免了四元数运算$\otimes$的繁琐使用。求导方式本文选择使用扰动模型\cite{zhang2021pose}进行，假设旋转的扰动值为$\symbf{\varphi } \in \mathbb{R}^3$（对于四元数和旋转矩阵有同样的效果），则：
+\begin{equation}
+  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{q}_{b_{k}}^o} \triangleq  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{\varphi }},
+\end{equation}
+即使用扰动模型来替代直接对四元数求导，具体运算为：
 \begin{align}
-  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{q}_{b_{k}}^o} &\triangleq  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{\varphi }} \\
+  \frac{\partial \symbf{r}'_{\mathcal{B}}}{\partial \symbf{\varphi }} 
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {\text{exp}(\symbf{\varphi }^{\land}) \cdot {\symbf{R}_{b_k}^o}^{-1}} \cdot \symbf{v}_{b_k}^o - \symbf{A} \cdot \symbf{R}_b^v \cdot {{\symbf{R}_{b_k}^o}^{-1}} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }} \\
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {\text{exp}(\symbf{\varphi }^{\land}) \cdot \symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o - \symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }} \\
   &= \lim\limits_{\symbf{\varphi } \to \symbf{0}} \frac{\symbf{A} \cdot \symbf{R}_b^v \cdot {[(\symbf{I} + \symbf{\varphi }^{\land}) \cdot \symbf{R}^{b_k}_o]} \cdot \symbf{v}_{b_k}^o - \symbf{A} \cdot \symbf{R}_b^v \cdot {\symbf{R}^{b_k}_o} \cdot \symbf{v}_{b_k}^o}{\symbf{\varphi }} \\
@@ -360,9 +362,9 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 \end{align}
 其中$(\cdot)^{\land}$表示将一个向量转换为反对称矩阵的函数，在推导中直接使用了近似
 \begin{equation}
-  \text{exp}(\symbf{\varphi }^{\land}) \approx \symbf{I} + \symbf{\varphi }^{\land}.
+  \text{exp}(\symbf{\varphi }^{\land}) \approx \symbf{I} + \symbf{\varphi }^{\land},
 \end{equation}
-和反对称矩阵的乘法交换规律
+以及反对称矩阵的乘法交换规律
 \begin{equation}
   \symbf{a}^{\land} \cdot \symbf{b} = -\symbf{b}^{\land} \cdot \symbf{a}.
 \end{equation}
@@ -374,4 +376,4 @@ $z^{\rm FOR}$表示车身横向速度为0假设是否成立，其分布为
 至此已经给出了速度伪观测对于估计量的雅可比矩阵。根据雅可比矩阵，使用高斯牛顿法或者列文伯格-马夸尔特法进行非线性优化，以获得最终的状态估计量。
 
 \section{本章总结}
-本章主要介绍了固定路线定位系统中的PO-VIO设计。整体设计考虑了车辆或轮式机器人的特殊运动模式，首先借助深度学习技术对车辆的运动模式进行判别，这一部分包括了网络设计、训练数据制作以及详细的训练过程；然后根据运动模式判别结果进行伪观测预处理，这一部分主要是使用PO-VIO本身估计的速度和车身运动模式进行粗对齐；最后将伪观测约束和惯性-车体因子加入到PO-VIO的非线性优化中，以提高定位的精度。
+本章主要介绍了固定路线定位系统中的PO-VIO设计。整体设计考虑了车辆或轮式机器人的特殊运动模式，首先借助深度学习技术对车辆的运动模式进行判别，这一部分包括了网络设计、训练数据制作以及详细的训练过程；然后根据运动模式判别结果进行伪观测预处理，这一部分主要是使用PO-VIO本身估计的速度和车身运动模式进行粗对齐；最后将伪观测约束和惯性-车体因子加入到PO-VIO的非线性优化中，以提高位姿估计的精度。

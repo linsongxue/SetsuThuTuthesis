@@ -34,42 +34,42 @@ q_w^2 + q_x^2 + q_y^2 + q_z^2 = 1.
 
 \section{光束法平差雅可比矩阵与优化}
 \label{appendix:bundle_adjustment}
-假设三维点 \( \mathbf{p} = (X, Y, Z)^T \) 在相机坐标系下的坐标为 \( \mathbf{p}_c \)，其投影到图像平面上的像素坐标为 \( \mathbf{p} = (u, v)^T \)。相机的内参矩阵为 \( \mathbf{K} \)，旋转矩阵为 \( \mathbf{R} \)，平移向量为 \( \mathbf{t} \)。则有：
+假设三维点 \( \symbf{p} = (X, Y, Z)^T \) 在相机坐标系下的坐标为 \( \symbf{p}_c \)，其投影到图像平面上的像素坐标为 \( \symbf{p} = (u, v)^T \)。相机的内参矩阵为 \( \symbf{K} \)，旋转矩阵为 \( \symbf{R} \)，平移向量为 \( \symbf{t} \)。则有：
 \begin{equation}
-\mathbf{p}_c = \mathbf{R} \mathbf{p} + \mathbf{t}
+\symbf{p}_c = \symbf{R} \symbf{p} + \symbf{t}
 \end{equation}
 \begin{equation}
-\mathbf{x} = \mathbf{K} \begin{bmatrix}
+\symbf{x} = \symbf{K} \begin{bmatrix}
 \frac{X_c}{Z_c} \\
 \frac{Y_c}{Z_c} \\
 1
 \end{bmatrix}
 \end{equation}
-其中，\( \mathbf{p}_c = (X_c, Y_c, Z_c)^T \) 为三维点在相机坐标系下的坐标。
-重投影误差 \( \mathbf{e} \) 定义为：
+其中，\( \symbf{p}_c = (X_c, Y_c, Z_c)^T \) 为三维点在相机坐标系下的坐标。
+重投影误差 \( \symbf{e} \) 定义为：
 \begin{equation}
-\mathbf{e} = \mathbf{x} - \mathbf{x}_{\text{obs}}
+\symbf{e} = \symbf{x} - \symbf{x}_{\text{obs}}
 \end{equation}
-其中，\( \mathbf{x}_{\text{obs}} \) 为实际观测到的像素坐标。
-为了进行优化，需要计算重投影误差对旋转 \( \mathbf{R} \)、平移 \( \mathbf{t} \) 和地图点 \( \mathbf{P} \) 的雅可比矩阵。利用链式法则，雅可比矩阵可以分解为以下部分：
+其中，\( \symbf{x}_{\text{obs}} \) 为实际观测到的像素坐标。
+为了进行优化，需要计算重投影误差对旋转 \( \symbf{R} \)、平移 \( \symbf{t} \) 和地图点 \( \symbf{P} \) 的雅可比矩阵。利用链式法则，雅可比矩阵可以分解为以下部分：
 \begin{equation}
-\frac{\partial \mathbf{e}}{\partial \mathbf{R}} = \frac{\partial \mathbf{e}}{\partial \mathbf{x}} \cdot \frac{\partial \mathbf{x}}{\partial \mathbf{p}_c} \cdot \frac{\partial \mathbf{p}_c}{\partial \mathbf{R}}
-\end{equation}
-
-\begin{equation}
-\frac{\partial \mathbf{e}}{\partial \mathbf{t}} = \frac{\partial \mathbf{e}}{\partial \mathbf{x}} \cdot \frac{\partial \mathbf{x}}{\partial \mathbf{p}_c} \cdot \frac{\partial \mathbf{p}_c}{\partial \mathbf{t}}
+\frac{\partial \symbf{e}}{\partial \symbf{R}} = \frac{\partial \symbf{e}}{\partial \symbf{x}} \cdot \frac{\partial \symbf{x}}{\partial \symbf{p}_c} \cdot \frac{\partial \symbf{p}_c}{\partial \symbf{R}}
 \end{equation}
 
 \begin{equation}
-\frac{\partial \mathbf{e}}{\partial \mathbf{p}} = \frac{\partial \mathbf{e}}{\partial \mathbf{x}} \cdot \frac{\partial \mathbf{x}}{\partial \mathbf{p}_c} \cdot \frac{\partial \mathbf{p}_c}{\partial \mathbf{p}}
+\frac{\partial \symbf{e}}{\partial \symbf{t}} = \frac{\partial \symbf{e}}{\partial \symbf{x}} \cdot \frac{\partial \symbf{x}}{\partial \symbf{p}_c} \cdot \frac{\partial \symbf{p}_c}{\partial \symbf{t}}
+\end{equation}
+
+\begin{equation}
+\frac{\partial \symbf{e}}{\partial \symbf{p}} = \frac{\partial \symbf{e}}{\partial \symbf{x}} \cdot \frac{\partial \symbf{x}}{\partial \symbf{p}_c} \cdot \frac{\partial \symbf{p}_c}{\partial \symbf{p}}
 \end{equation}
 其中，各部分的雅可比矩阵为：
 \begin{equation}
-\frac{\partial \mathbf{e}}{\partial \mathbf{x}} = \mathbf{I}_{2 \times 2}
+\frac{\partial \symbf{e}}{\partial \symbf{x}} = \symbf{I}_{2 \times 2}
 \end{equation}
 
 \begin{equation}
-\frac{\partial \mathbf{p}}{\partial \mathbf{p}_c} = \mathbf{K} \cdot \begin{bmatrix}
+\frac{\partial \symbf{p}}{\partial \symbf{p}_c} = \symbf{K} \cdot \begin{bmatrix}
 \frac{1}{Z_c} & 0 & -\frac{X_c}{Z_c^2} \\
 0 & \frac{1}{Z_c} & -\frac{Y_c}{Z_c^2} \\
 0 & 0 & 0
@@ -77,19 +77,19 @@ q_w^2 + q_x^2 + q_y^2 + q_z^2 = 1.
 \end{equation}
 
 \begin{equation}
-\frac{\partial \mathbf{p}_c}{\partial \mathbf{R}} = -\mathbf{R} \cdot \left[ \mathbf{p} \right]_\times
+\frac{\partial \symbf{p}_c}{\partial \symbf{R}} = -\symbf{R} \cdot \left[ \symbf{p} \right]_\times
 \end{equation}
 
 \begin{equation}
-\frac{\partial \mathbf{p}_c}{\partial \mathbf{t}} = \mathbf{I}_{3 \times 3}
+\frac{\partial \symbf{p}_c}{\partial \symbf{t}} = \symbf{I}_{3 \times 3}
 \end{equation}
 
 \begin{equation}
-\frac{\partial \mathbf{p}_c}{\partial \mathbf{p}} = \mathbf{R}
+\frac{\partial \symbf{p}_c}{\partial \symbf{p}} = \symbf{R}
 \end{equation}
-其中，\( \left[ \mathbf{p} \right]_\times \) 表示向量 \( \mathbf{P} \) 的反对称矩阵：
+其中，\( \left[ \symbf{p} \right]_\times \) 表示向量 \( \symbf{P} \) 的反对称矩阵：
 \begin{equation}
-\left[ \mathbf{p} \right]_\times = \begin{bmatrix}
+\left[ \symbf{p} \right]_\times = \begin{bmatrix}
 0 & -Z & Y \\
 Z & 0 & -X \\
 -Y & X & 0
@@ -97,36 +97,36 @@ Z & 0 & -X \\
 \end{equation}
 将上述各部分雅可比矩阵相乘，即可得到重投影误差对旋转、平移和地图点的雅可比矩阵。
 
-高斯-牛顿法是一种用于求解非线性最小二乘问题的迭代算法。其目标是找到参数向量 \( \mathbf{x} \)，使得残差的平方和最小化。具体而言，目标函数可以表示为：
+高斯-牛顿法是一种用于求解非线性最小二乘问题的迭代算法。其目标是找到参数向量 \( \symbf{x} \)，使得残差的平方和最小化。具体而言，目标函数可以表示为：
 \begin{equation}
-F(\mathbf{x}) = \frac{1}{2} \sum_{i=1}^{m} r_i^2(\mathbf{x})
+F(\symbf{x}) = \frac{1}{2} \sum_{i=1}^{m} r_i^2(\symbf{x})
 \end{equation}
-其中，\( r_i(\mathbf{x}) \) 表示第 \( i \) 个残差函数，\( m \) 为残差的数量。
-为了最小化 \( F(\mathbf{x}) \)，我们需要找到使其梯度为零的 \( \mathbf{x} \)。首先，计算目标函数的梯度：
+其中，\( r_i(\symbf{x}) \) 表示第 \( i \) 个残差函数，\( m \) 为残差的数量。
+为了最小化 \( F(\symbf{x}) \)，本文需要找到使其数值下降的参数更新量$\Delta \symbf{x}$。首先，计算目标函数的梯度：
 \begin{equation}
-\nabla F(\mathbf{x}) = \sum_{i=1}^{m} r_i(\mathbf{x}) \nabla r_i(\mathbf{x})
+\nabla F(\symbf{x}) = \sum_{i=1}^{m} \nabla r_i(\symbf{x})^{T} r_i(\symbf{x})
 \end{equation}
-其中，\( \nabla r_i(\mathbf{x}) \) 是残差函数 \( r_i(\mathbf{x}) \) 关于 \( \mathbf{x} \) 的梯度。
-接下来，对每个残差函数 \( r_i(\mathbf{x}) \) 进行一阶泰勒展开：
+其中，\( \nabla r_i(\symbf{x}) \) 是残差函数 \( r_i(\symbf{x}) \) 关于 \( \symbf{x} \) 的梯度。
+接下来，对每个残差函数 \( r_i(\symbf{x}) \) 进行一阶泰勒展开：
 \begin{equation}
-r_i(\mathbf{x} + \Delta \mathbf{x}) \approx r_i(\mathbf{x}) + \nabla r_i(\mathbf{x})^T \Delta \mathbf{x}
+r_i(\symbf{x} + \Delta \symbf{x}) \approx r_i(\symbf{x}) + \nabla r_i(\symbf{x})^T \Delta \symbf{x}
 \end{equation}
 将其代入目标函数的梯度表达式，得到：
 \begin{equation}
-\nabla F(\mathbf{x} + \Delta \mathbf{x}) \approx \sum_{i=1}^{m} \left[ r_i(\mathbf{x}) + \nabla r_i(\mathbf{x})^T \Delta \mathbf{x} \right] \nabla r_i(\mathbf{x})
+\nabla F(\symbf{x} + \Delta \symbf{x}) \approx \sum_{i=1}^{m} \nabla r_i(\symbf{x})^{T} \left[ r_i(\symbf{x}) + \nabla r_i(\symbf{x})^T \Delta \symbf{x} \right] 
 \end{equation}
-为了使梯度为零，需要解以下线性方程组：
+为了使梯度为零，需要解以下线性方程组，其中将$r_i(\symbf{x})$记作$\symbf{J}(\symbf{x})$：
 \begin{equation}
-\mathbf{J}(\mathbf{x})^T \mathbf{r}(\mathbf{x}) + \mathbf{J}(\mathbf{x})^T \mathbf{J}(\mathbf{x}) \Delta \mathbf{x} = 0
+\symbf{J}(\symbf{x})^T \symbf{r}(\symbf{x}) + \symbf{J}(\symbf{x})^T \symbf{J}(\symbf{x}) \Delta \symbf{x} = 0
 \end{equation}
-其中，\( \mathbf{J}(\mathbf{x}) \) 是残差函数的雅可比矩阵，\( \mathbf{r}(\mathbf{x}) \) 是所有残差的向量表示。
+其中，\( \symbf{J}(\symbf{x}) \) 是残差函数的雅可比矩阵，\( \symbf{r}(\symbf{x}) \) 是所有残差的向量表示。
 解上述方程组，得到参数更新量：
 \begin{equation}
-\Delta \mathbf{x} = -\left[ \mathbf{J}(\mathbf{x})^T \mathbf{J}(\mathbf{x}) \right]^{-1} \mathbf{J}(\mathbf{x})^T \mathbf{r}(\mathbf{x})
+\Delta \symbf{x} = -\left[ \symbf{J}(\symbf{x})^T \symbf{J}(\symbf{x}) \right]^{-1} \symbf{J}(\symbf{x})^T \symbf{r}(\symbf{x})
 \end{equation}
 然后，更新参数：
 \begin{equation}
-\mathbf{x} \leftarrow \mathbf{x} + \Delta \mathbf{x}
+\symbf{x} \leftarrow \symbf{x} + \Delta \symbf{x}
 \end{equation}
 重复上述步骤，直到满足收敛条件。
 
